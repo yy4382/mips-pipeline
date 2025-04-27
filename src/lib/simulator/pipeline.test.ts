@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { Pipeline } from "./pipline";
+import { Pipeline } from "./pipeline";
 import { InstructionMemory } from "./instruction";
 
 test("pipeline - basic", () => {

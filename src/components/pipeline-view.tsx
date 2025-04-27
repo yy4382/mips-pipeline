@@ -1,4 +1,4 @@
-import { PipelineRegs } from "../lib/simulator/pipline";
+import { PipelineRegs } from "../lib/simulator/hardware/pipeline-registers";
 
 export function PipelineView({ pipelineRegs }: { pipelineRegs: PipelineRegs }) {
   return (
