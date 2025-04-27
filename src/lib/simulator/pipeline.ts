@@ -23,6 +23,14 @@ export type ForwardDetail = {
   data: number;
 };
 
+export type Statics = {
+  clockCycles: number;
+  finishedInsts: number;
+  dataHazardStalls: number;
+  predictFails: number;
+  forwardCount: number;
+};
+
 export class Pipeline {
   /**
    * pc is similar to PC in CPU, but it steps 1 by 1, instead of 4 by 4.
@@ -34,14 +42,22 @@ export class Pipeline {
   mem: Memory;
   pipelineRegs: PipelineRegs;
   forwarding: boolean;
+  statics: Statics;
 
-  constructor(iMem: InstructionMemory, forwading: boolean = false) {
+  constructor(iMem: InstructionMemory, forwarding: boolean = false) {
     this.pc = 0;
     this.registerFile = new RegisterFile();
     this.iMem = iMem;
     this.mem = new Memory();
     this.pipelineRegs = getDefaultPipelineRegs();
-    this.forwarding = forwading;
+    this.forwarding = forwarding;
+    this.statics = {
+      clockCycles: 0,
+      finishedInsts: 0,
+      dataHazardStalls: 0,
+      predictFails: 0,
+      forwardCount: 0,
+    };
   }
 
   tick(
@@ -75,6 +91,7 @@ export class Pipeline {
         inst: newPipelineRegs.ex2mem.inst,
         desc: "branch prediction failed, flushed the first two stages`",
       });
+      this.statics.predictFails += 1;
 
       // flush the pipeline (making the just-run instructions in IF and ID into NOP)
       newPipelineRegs.id2ex = getDefaultPipelineRegs().id2ex;
@@ -83,7 +100,10 @@ export class Pipeline {
     } else {
       let hazard;
       if (this.forwarding) {
-        hazard = tryForward(newPipelineRegs, forwardCb);
+        const addForwardCount = () => {
+          this.statics.forwardCount += 1;
+        };
+        hazard = tryForward(newPipelineRegs, forwardCb, addForwardCount);
       } else {
         hazard = calculateHazards(newPipelineRegs);
       }
@@ -93,6 +113,7 @@ export class Pipeline {
           inst: newPipelineRegs.id2ex.inst,
           desc: "data hazard detected, inserted a bubble to ID/EX registers and prevented first two stages to move on",
         });
+        this.statics.dataHazardStalls += 1;
 
         // insert a bubble
         newPipelineRegs.id2ex = getDefaultPipelineRegs().id2ex;
@@ -102,6 +123,13 @@ export class Pipeline {
         this.pc++;
       }
     }
+
+    // update statics
+    this.statics.clockCycles += 1;
+    if (this.pipelineRegs.mem2wb.inst.originalIndex !== undefined) {
+      this.statics.finishedInsts += 1;
+    }
+
     this.pipelineRegs = newPipelineRegs;
   }
 
@@ -111,6 +139,13 @@ export class Pipeline {
     // this.iMem.reset();
     this.mem.reset();
     this.pipelineRegs = getDefaultPipelineRegs();
+    this.statics = {
+      clockCycles: 0,
+      finishedInsts: 0,
+      dataHazardStalls: 0,
+      predictFails: 0,
+      forwardCount: 0,
+    };
   }
 
   resetAll() {
@@ -324,7 +359,8 @@ function checkForwardingForRegister(
  */
 function tryForward(
   pipelineRegs: PipelineRegs,
-  forwardCb: (arg: ForwardDetail) => void
+  forwardCb: (arg: ForwardDetail) => void,
+  addForwardCount: () => void
 ): boolean {
   const resultRs1 = checkForwardingForRegister(
     pipelineRegs.id2ex.inst.rs1,
@@ -350,6 +386,7 @@ function tryForward(
       },
     };
     forwardCb(detail);
+    addForwardCount();
     console.debug(detail);
   }
   if (resultRs2.forwardDetail !== undefined) {
@@ -362,6 +399,7 @@ function tryForward(
       },
     };
     forwardCb(detail);
+    addForwardCount();
     console.debug(detail);
   }
   return false; // No stall needed

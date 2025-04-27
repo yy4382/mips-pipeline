@@ -18,6 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { MemoryViewer } from "./memory-viewer";
 import { RegisterFileViewer } from "./register-file-viewer";
+import { Statics } from "./statics";
 
 const DEFAULT_INSTRUCTION = `
 load $1, 0($0)
@@ -45,6 +46,8 @@ export function PipelineComp() {
   const [pipelineRegs, setPipelineRegs] = useState(
     pipelineRef.current.pipelineRegs
   );
+  const [statics, setStatics] = useState(pipelineRef.current.statics);
+
   const hazardCallback = useCallback<HazardCallback>((type, cause) => {
     toast(
       <div>
@@ -74,6 +77,7 @@ export function PipelineComp() {
   const handlePipelineChange = () => {
     setInstWithStage(parseInstWithStage(pipelineRef.current));
     setPipelineRegs(pipelineRef.current.pipelineRegs);
+    setStatics({ ...pipelineRef.current.statics });
   };
 
   const handleTick = () => {
@@ -120,6 +124,8 @@ export function PipelineComp() {
         <MemoryViewer memory={pipelineRef.current.mem} />
         <RegisterFileViewer registerFile={pipelineRef.current.registerFile} />
       </div>
+      <Statics statics={statics} forwardStatus={useForwarding} />
+
       <InstructionInput onChange={handleSetIMem} />
     </div>
   );
