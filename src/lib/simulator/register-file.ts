@@ -23,4 +23,7 @@ export class RegisterFile {
     }
     this.registers[index] = value;
   }
+  reset() {
+    this.registers.fill(0);
+  }
 }

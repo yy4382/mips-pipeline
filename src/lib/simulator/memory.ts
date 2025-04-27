@@ -16,4 +16,7 @@ export class Memory {
     }
     this.memory[index] = value;
   }
+  reset() {
+    this.memory.fill(0);
+  }
 }

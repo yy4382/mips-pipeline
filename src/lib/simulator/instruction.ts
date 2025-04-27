@@ -1,15 +1,31 @@
 class Instruction {
   public raw: string;
-  constructor(raw: string) {
+  public originalIndex: number | undefined;
+  constructor(raw: string, originalIndex?: number) {
     this.raw = raw;
+    this.originalIndex = originalIndex;
+  }
+
+  get rs1(): number | undefined {
+    throw new Error("rs1 unimplemented");
+  }
+  get rs2(): number | undefined {
+    throw new Error("rs2 unimplemented");
+  }
+  get rd(): number | undefined {
+    throw new Error("rd unimplemented");
+  }
+  get immediate(): number | undefined {
+    throw new Error("immediate unimplemented");
   }
 
   static default(): ArithmeticInstruction {
-    return new ArithmeticInstruction(0, 0, 0, "add", "add $0, $0, $0");
+    return new ArithmeticInstruction(0, 0, 0, "add", "add $0, $0, $0 #NOP");
   }
 
-  static parse(raw: string): Instruction {
-    const parts = raw.split(" ");
+  static parse(raw: string, index?: number): Instruction {
+    const rawParts = raw.split("#");
+    const parts = rawParts[0].split(" ");
     const instructionType = parts[0];
     const args = parts
       .slice(1)
@@ -54,7 +70,8 @@ class Instruction {
           registerIndex,
           addressRegisterIndex,
           instructionType as "load" | "store",
-          raw
+          raw,
+          index
         );
       }
       case "add": {
@@ -76,7 +93,8 @@ class Instruction {
           registerIndex2,
           resultRegisterIndex,
           "add",
-          raw
+          raw,
+          index
         );
       }
       case "beqz": {
@@ -87,7 +105,7 @@ class Instruction {
         }
         const registerIndex = parseInt(args[0].substring(1));
         const offset = parseInt(args[1]);
-        return new BranchInstruction("beqz", registerIndex, offset, raw);
+        return new BranchInstruction("beqz", registerIndex, offset, raw, index);
       }
       default:
         throw new Error(`Unknown instruction type: ${instructionType}`);
@@ -106,13 +124,33 @@ class LoadSaveInstruction extends Instruction {
     registerIndex: number,
     startingRegisterIndex: number,
     type: "load" | "store",
-    raw: string
+    raw: string,
+    originalIndex?: number
   ) {
-    super(raw);
+    super(raw, originalIndex);
     this.addressOffset = addressOffset;
     this.registerIndex = registerIndex;
     this.startingRegisterIndex = startingRegisterIndex;
     this.type = type;
+  }
+
+  get rs1(): number {
+    return this.startingRegisterIndex;
+  }
+  get rs2(): number | undefined {
+    if (this.type === "store") {
+      return this.registerIndex;
+    }
+    return undefined;
+  }
+  get rd(): number | undefined {
+    if (this.type === "load") {
+      return this.registerIndex;
+    }
+    return undefined;
+  }
+  get immediate(): number {
+    return this.addressOffset;
   }
 }
 
@@ -127,13 +165,26 @@ class ArithmeticInstruction extends Instruction {
     registerIndex2: number,
     resultRegisterIndex: number,
     operation: "add",
-    raw: string
+    raw: string,
+    originalIndex?: number
   ) {
-    super(raw);
+    super(raw, originalIndex);
     this.registerIndex1 = registerIndex1;
     this.registerIndex2 = registerIndex2;
     this.resultRegisterIndex = resultRegisterIndex;
     this.operation = operation;
+  }
+  get rs1(): number {
+    return this.registerIndex1;
+  }
+  get rs2(): number {
+    return this.registerIndex2;
+  }
+  get rd(): number {
+    return this.resultRegisterIndex;
+  }
+  get immediate(): number | undefined {
+    return undefined;
   }
 }
 
@@ -145,17 +196,30 @@ class BranchInstruction extends Instruction {
     type: "beqz",
     registerIndex: number,
     offset: number,
-    raw: string
+    raw: string,
+    originalIndex?: number
   ) {
-    super(raw);
+    super(raw, originalIndex);
     this.type = type;
     this.registerIndex = registerIndex;
     this.offset = offset;
   }
+  get rs1(): number {
+    return this.registerIndex;
+  }
+  get rs2(): number | undefined {
+    return undefined;
+  }
+  get rd(): number | undefined {
+    return undefined;
+  }
+  get immediate(): number {
+    return this.offset;
+  }
 }
 
 class InstructionMemory {
-  private instructions: Instruction[];
+  public instructions: Instruction[];
 
   constructor(instructions: Instruction[]) {
     this.instructions = instructions;
@@ -179,8 +243,12 @@ class InstructionMemory {
       .map((line) => line.trim())
       .filter((line) => line.length > 0)
       .filter((line) => !line.startsWith("#"))
-      .map((line) => Instruction.parse(line));
+      .map((line, index) => Instruction.parse(line, index));
     return new InstructionMemory(instructions);
+  }
+
+  reset() {
+    this.instructions = [];
   }
 }
 
