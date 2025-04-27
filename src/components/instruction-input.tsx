@@ -50,7 +50,14 @@ export function InstructionInput({
         htmlFor="instruction-input"
         className="text-sm font-medium text-gray-700 mb-2"
       >
-        Instruction
+        Instruction (
+        <a
+          className="underline"
+          href="https://github.com/yy4382/mips-pipeline/blob/main/src/lib/simulator/spec.md"
+        >
+          spec
+        </a>
+        )
       </label>
       <Textarea
         id="instruction-input"

@@ -1,5 +1,6 @@
 import { PipelineComp } from "./components/pipeline";
 import { Toaster } from "@/components/ui/sonner";
+import { buttonVariants } from "./components/ui/button";
 
 function App() {
   return (
@@ -12,10 +13,18 @@ function App() {
             </h1>
             <p className="text-center text-slate-500 dark:text-slate-400 mt-2">
               Visual representation of a MIPS pipeline with hazard detection
+              <br />A course project, NOT ACTUALLY MIPS COMPATIBLE!
+              <br />
+              <a
+                href="https://github.com/yy4382/mips-pipeline"
+                className={buttonVariants({ variant: "link" })}
+              >
+                GitHub
+              </a>
             </p>
           </div>
         </header>
-        
+
         <main className="container mx-auto px-4">
           <PipelineComp />
         </main>
