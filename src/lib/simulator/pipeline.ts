@@ -69,15 +69,18 @@ export class Pipeline {
   tick(
     stopAt: number | undefined = undefined,
     hazardCallback: HazardCallback = () => {},
-    forwardCb: (arg: ForwardDetail) => void = () => {}
+    forwardCb: (arg: ForwardDetail) => void = () => {},
+    tickCallback: (arg: Pipeline) => void = () => {}
   ) {
     if (stopAt === undefined) {
       this._tick(hazardCallback, forwardCb);
+      tickCallback(this);
       return;
     }
     if (stopAt === -1) {
       while (!this.isFinished()) {
         this._tick(hazardCallback, forwardCb);
+        tickCallback(this);
       }
       return;
     }
@@ -86,6 +89,7 @@ export class Pipeline {
       !this.isFinished()
     ) {
       this._tick(hazardCallback, forwardCb);
+      tickCallback(this);
     }
   }
 
@@ -162,7 +166,7 @@ export class Pipeline {
     this.pipelineRegs = newPipelineRegs;
   }
 
-  reset() {
+  reset(resetCallback: (pipeline: Pipeline) => void) {
     this.pc = 0;
     this.registerFile.reset();
     // this.iMem.reset();
@@ -175,21 +179,23 @@ export class Pipeline {
       predictFails: 0,
       forwardCount: 0,
     };
+    resetCallback(this);
   }
 
-  resetAll() {
-    this.reset();
-    this.iMem.reset();
-  }
-
-  setIMem(iMem: InstructionMemory) {
-    this.reset();
+  setIMem(
+    iMem: InstructionMemory,
+    resetCallback: (pipeline: Pipeline) => void
+  ) {
     this.iMem = iMem;
+    this.reset(resetCallback);
   }
 
-  setForwarding(forwarding: boolean) {
+  setForwarding(
+    forwarding: boolean,
+    resetCallback: (pipeline: Pipeline) => void
+  ) {
     this.forwarding = forwarding;
-    this.reset();
+    this.reset(resetCallback);
   }
 
   writeBackStage({

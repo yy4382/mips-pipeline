@@ -29,7 +29,7 @@ function App() {
           <PipelineComp />
         </main>
       </div>
-      <Toaster toastOptions={{ duration: 10000 }} />
+      <Toaster toastOptions={{ duration: 10000 }} visibleToasts={20} />
     </>
   );
 }

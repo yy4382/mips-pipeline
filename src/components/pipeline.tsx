@@ -17,6 +17,7 @@ import { MemoryViewer } from "./memory-viewer";
 import { RegisterFileViewer } from "./register-file-viewer";
 import { Statics } from "./statics";
 import { PipelineControls } from "./pipeline-controls";
+import { InstructionCycleGraph } from "./instruction-cycle-graph"; // Import the new component
 
 const DEFAULT_INSTRUCTION = `
 load $1, 0($0)
@@ -38,9 +39,9 @@ export function PipelineComp() {
     new Pipeline(InstructionMemory.parse(DEFAULT_INSTRUCTION), useForwarding)
   );
 
-  const [instWithStage, setInstWithStage] = useState<InstWithStage[]>(
-    parseInstWithStage(pipelineRef.current)
-  );
+  const [instCycleGraph, setInstCycleGraph] = useState<InstCycleGraphData>([
+    { cycle: 0, instructions: parseInstWithStage(pipelineRef.current) },
+  ]);
   const [pipelineRegs, setPipelineRegs] = useState(
     pipelineRef.current.pipelineRegs
   );
@@ -72,31 +73,62 @@ export function PipelineComp() {
     );
   }, []);
 
-  const handlePipelineChange = () => {
-    setInstWithStage(parseInstWithStage(pipelineRef.current));
-    setPipelineRegs(pipelineRef.current.pipelineRegs);
-    setStatics({ ...pipelineRef.current.statics });
-  };
+  const tickCallback = useCallback(
+    (pipeline: Pipeline) => {
+      setPipelineRegs(pipeline.pipelineRegs);
+      setStatics({ ...pipeline.statics });
+
+      const newInstWithStage = parseInstWithStage(pipeline);
+      const currentCycle = pipeline.statics.clockCycles;
+
+      setInstCycleGraph((prev) => {
+        return [
+          ...prev,
+          {
+            cycle: currentCycle,
+            instructions: newInstWithStage,
+          },
+        ];
+      });
+    },
+    [setInstCycleGraph, setPipelineRegs, setStatics]
+  );
 
   const handleTick = (stopAt: number | undefined) => {
-    pipelineRef.current.tick(stopAt, hazardCallback, forwardCallback);
-    handlePipelineChange();
+    pipelineRef.current.tick(
+      stopAt,
+      hazardCallback,
+      forwardCallback,
+      tickCallback
+    );
   };
 
+  const resetCallback = useCallback(
+    (pipeline: Pipeline) => {
+      console.debug("Pipeline reset callback called");
+      setPipelineRegs(pipeline.pipelineRegs);
+      setStatics({ ...pipeline.statics });
+      setInstCycleGraph([
+        {
+          cycle: 0,
+          instructions: parseInstWithStage(pipeline),
+        },
+      ]);
+    },
+    [setInstCycleGraph, setPipelineRegs, setStatics]
+  );
+
   const handleReset = () => {
-    pipelineRef.current.reset();
-    handlePipelineChange();
+    pipelineRef.current.reset(resetCallback);
   };
 
   const handleSetIMem = (s: string) => {
-    pipelineRef.current.setIMem(InstructionMemory.parse(s));
-    handlePipelineChange();
+    pipelineRef.current.setIMem(InstructionMemory.parse(s), resetCallback);
   };
 
   const handleForwardingChange = (checked: boolean) => {
     setUseForwarding(checked);
-    pipelineRef.current.setForwarding(checked);
-    handlePipelineChange();
+    pipelineRef.current.setForwarding(checked, resetCallback);
   };
 
   return (
@@ -111,6 +143,10 @@ export function PipelineComp() {
         />
       </div>
 
+      <div className="mb-6">
+        <InstructionCycleGraph data={instCycleGraph} />
+      </div>
+
       {/* Main content: 2-column grid */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left column (2/5 width) */}
@@ -121,7 +157,7 @@ export function PipelineComp() {
 
         {/* Right column (3/5 width) */}
         <div className="lg:col-span-3 flex flex-col gap-6">
-          <InstructionList instructions={instWithStage} />
+          <InstructionList instructions={instCycleGraph.at(-1)!.instructions} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <MemoryViewer memory={pipelineRef.current.mem} />
             <RegisterFileViewer
@@ -138,3 +174,8 @@ export function PipelineComp() {
     </div>
   );
 }
+
+export type InstCycleGraphData = {
+  cycle: number;
+  instructions: InstWithStage[];
+}[];
