@@ -15,7 +15,7 @@ import { InstructionInput } from "./instruction-input";
 import { toast } from "sonner";
 import { MemoryViewer } from "./memory-viewer";
 import { RegisterFileViewer } from "./register-file-viewer";
-import { Statics } from "./statics";
+import { Statistics } from "./statistics";
 import { PipelineControls } from "./pipeline-controls";
 import { InstructionCycleGraph } from "./instruction-cycle-graph"; // Import the new component
 
@@ -45,7 +45,7 @@ export function PipelineComp() {
   const [pipelineRegs, setPipelineRegs] = useState(
     pipelineRef.current.pipelineRegs
   );
-  const [statics, setStatics] = useState(pipelineRef.current.statics);
+  const [statistics, setStatistics] = useState(pipelineRef.current.statistics);
 
   const hazardCallback = useCallback<HazardCallback>((type, cause) => {
     toast(
@@ -76,10 +76,10 @@ export function PipelineComp() {
   const tickCallback = useCallback(
     (pipeline: Pipeline) => {
       setPipelineRegs(pipeline.pipelineRegs);
-      setStatics({ ...pipeline.statics });
+      setStatistics({ ...pipeline.statistics });
 
       const newInstWithStage = parseInstWithStage(pipeline);
-      const currentCycle = pipeline.statics.clockCycles;
+      const currentCycle = pipeline.statistics.clockCycles;
 
       setInstCycleGraph((prev) => {
         return [
@@ -91,7 +91,7 @@ export function PipelineComp() {
         ];
       });
     },
-    [setInstCycleGraph, setPipelineRegs, setStatics]
+    [setInstCycleGraph, setPipelineRegs, setStatistics]
   );
 
   const handleTick = (stopAt: number | undefined) => {
@@ -107,7 +107,7 @@ export function PipelineComp() {
     (pipeline: Pipeline) => {
       console.debug("Pipeline reset callback called");
       setPipelineRegs(pipeline.pipelineRegs);
-      setStatics({ ...pipeline.statics });
+      setStatistics({ ...pipeline.statistics });
       setInstCycleGraph([
         {
           cycle: 0,
@@ -115,7 +115,7 @@ export function PipelineComp() {
         },
       ]);
     },
-    [setInstCycleGraph, setPipelineRegs, setStatics]
+    [setInstCycleGraph, setPipelineRegs, setStatistics]
   );
 
   const handleReset = () => {
@@ -152,7 +152,7 @@ export function PipelineComp() {
         {/* Left column (2/5 width) */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           <PipelineView pipelineRegs={pipelineRegs} />
-          <Statics statics={statics} forwardStatus={useForwarding} />
+          <Statistics statistics={statistics} forwardStatus={useForwarding} />
         </div>
 
         {/* Right column (3/5 width) */}

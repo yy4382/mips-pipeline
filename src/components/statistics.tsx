@@ -1,16 +1,16 @@
-import { type Statics } from "@/lib/simulator/pipeline";
+import { type Statistics } from "@/lib/simulator/pipeline";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-export function Statics({
-  statics,
+export function Statistics({
+  statistics,
   forwardStatus,
 }: {
-  statics: Statics;
+  statistics: Statistics;
   forwardStatus: boolean;
 }) {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Statics</CardTitle>
+        <CardTitle>Statistics</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm">
         <p>
@@ -19,23 +19,23 @@ export function Statics({
         </p>
         <p>
           <span className="font-medium">Clock Cycles:</span>{" "}
-          {statics.clockCycles}
+          {statistics.clockCycles}
         </p>
         <p>
           <span className="font-medium">Finished Instructions:</span>{" "}
-          {statics.finishedInsts}
+          {statistics.finishedInsts}
         </p>
         <p>
           <span className="font-medium">Data Hazard Stalls:</span>{" "}
-          {statics.dataHazardStalls}
+          {statistics.dataHazardStalls}
         </p>
         <p>
           <span className="font-medium">Branch Prediction Fails:</span>{" "}
-          {statics.predictFails}
+          {statistics.predictFails}
         </p>
         <p>
           <span className="font-medium">Forward Count:</span>{" "}
-          {statics.forwardCount}
+          {statistics.forwardCount}
         </p>
       </CardContent>
     </Card>
