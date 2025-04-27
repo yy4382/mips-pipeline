@@ -11,6 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "./ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 interface MemoryViewerProps {
   memory: Memory;
@@ -112,49 +113,53 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
   };
 
   return (
-    <div className="p-4 border rounded-md w-full max-w-120">
-      <h2 className="text-lg font-semibold mb-2">Memory Contents</h2>
-      <ScrollArea className="h-[400px] w-full">
-        {" "}
-        {/* Adjust height as needed */}
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">Address</TableHead>
-              <TableHead>Value</TableHead>
-              <TableHead className="w-[80px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {Array.from({ length: memorySize }).map((_, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-mono">{index}</TableCell>
-                <TableCell>
-                  <Input
-                    type="text" // Use text to allow intermediate invalid states
-                    value={editableMemory[index] ?? ""} // Use local state for input value
-                    onChange={(e) => handleInputChange(index, e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e, index)} // Save on Enter, revert on Escape
-                    className="font-mono h-8" // Adjust size as needed
-                  />
-                </TableCell>
-                <TableCell>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleSave(index)}
-                    disabled={
-                      editableMemory[index] === memory.getAt(index).toString()
-                    } // Disable if unchanged
-                  >
-                    Save
-                  </Button>
-                </TableCell>
+    <Card className="w-full max-w-120">
+      <CardHeader>
+        <CardTitle>Memory Contents</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ScrollArea className="h-[300px] w-full">
+          {" "}
+          {/* Adjust height as needed */}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[100px]">Address</TableHead>
+                <TableHead>Value</TableHead>
+                <TableHead className="w-[80px]">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </ScrollArea>
-    </div>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: memorySize }).map((_, index) => (
+                <TableRow key={index}>
+                  <TableCell className="font-mono">{index}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="text" // Use text to allow intermediate invalid states
+                      value={editableMemory[index] ?? ""} // Use local state for input value
+                      onChange={(e) => handleInputChange(index, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, index)} // Save on Enter, revert on Escape
+                      className="font-mono h-8" // Adjust size as needed
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSave(index)}
+                      disabled={
+                        editableMemory[index] === memory.getAt(index).toString()
+                      } // Disable if unchanged
+                    >
+                      Save
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 };

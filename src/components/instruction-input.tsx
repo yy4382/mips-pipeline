@@ -45,7 +45,7 @@ export function InstructionInput({
   };
 
   return (
-    <div className="flex flex-col p-4">
+    <div className="flex flex-col p-4 min-w-92">
       <label
         htmlFor="instruction-input"
         className="text-sm font-medium text-gray-700 mb-2"

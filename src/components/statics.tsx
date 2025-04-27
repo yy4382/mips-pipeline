@@ -8,11 +8,11 @@ export function Statics({
   forwardStatus: boolean;
 }) {
   return (
-    <Card className="w-full max-w-150">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Statics</CardTitle>
       </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+      <CardContent className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm">
         <p>
           <span className="font-medium">Forwarding:</span>{" "}
           {forwardStatus ? "Enabled" : "Disabled"}

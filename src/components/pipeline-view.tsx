@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 export function PipelineView({ pipelineRegs }: { pipelineRegs: PipelineRegs }) {
   return (
-    <Card className="w-full max-w-120 min-w-100">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Pipeline Registers</CardTitle>
       </CardHeader>

@@ -16,7 +16,7 @@ export function InstructionList({
   instructions: InstWithStage[];
 }) {
   return (
-    <Card className="w-full max-w-120 min-w-100">
+    <Card className="w-full">
       <CardHeader>
         <h2 className="text-lg font-semibold">Instruction List</h2>
       </CardHeader>
@@ -35,9 +35,7 @@ export function InstructionList({
                 <TableRow key={index}>
                   <TableCell>{inst.inst.originalIndex}</TableCell>
                   <TableCell>
-                    <span title={inst.inst.raw}>
-                      {truncateString(inst.inst.raw)}
-                    </span>
+                    <span title={inst.inst.raw}>{inst.inst.raw}</span>
                   </TableCell>
                   <TableCell>{inst.stage ?? ""}</TableCell>
                 </TableRow>
@@ -48,10 +46,4 @@ export function InstructionList({
       </CardContent>
     </Card>
   );
-}
-function truncateString(str: string, len = 24) {
-  if (str.length > len) {
-    return str.substring(0, len) + "..."; // Truncate and add "..."
-  }
-  return str; // Return the original string if it's less than or equal to 20 characters
 }

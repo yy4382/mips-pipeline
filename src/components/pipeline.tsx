@@ -12,14 +12,11 @@ import {
 import { InstructionList } from "./instruction-list";
 import { PipelineView } from "./pipeline-view";
 import { InstructionInput } from "./instruction-input";
-import { Button } from "./ui/button";
 import { toast } from "sonner";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { MemoryViewer } from "./memory-viewer";
 import { RegisterFileViewer } from "./register-file-viewer";
 import { Statics } from "./statics";
-import { Input } from "./ui/input";
+import { PipelineControls } from "./pipeline-controls";
 
 const DEFAULT_INSTRUCTION = `
 load $1, 0($0)
@@ -40,8 +37,6 @@ export function PipelineComp() {
   const pipelineRef = useRef<Pipeline>(
     new Pipeline(InstructionMemory.parse(DEFAULT_INSTRUCTION), useForwarding)
   );
-
-  const [breakpoint, setBreakpoint] = useState<number>(0);
 
   const [instWithStage, setInstWithStage] = useState<InstWithStage[]>(
     parseInstWithStage(pipelineRef.current)
@@ -92,6 +87,7 @@ export function PipelineComp() {
     pipelineRef.current.reset();
     handlePipelineChange();
   };
+
   const handleSetIMem = (s: string) => {
     pipelineRef.current.setIMem(InstructionMemory.parse(s));
     handlePipelineChange();
@@ -104,62 +100,41 @@ export function PipelineComp() {
   };
 
   return (
-    <div className="flex flex-col gap-4 items-center">
-      <div className="flex flex-wrap gap-4 items-center justify-center p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 w-fit mx-auto">
-        <div className="flex gap-2">
-          <Button onClick={() => handleTick(undefined)}>Step</Button>
-          <Button onClick={() => handleTick(-1)}>Run to End</Button>
+    <div className="container mx-auto p-4">
+      {/* Top section: Controls */}
+      <div className="mb-6">
+        <PipelineControls
+          useForwarding={useForwarding}
+          onForwardingChange={handleForwardingChange}
+          onTick={handleTick}
+          onReset={handleReset}
+        />
+      </div>
+
+      {/* Main content: 2-column grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left column (2/5 width) */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          <PipelineView pipelineRegs={pipelineRegs} />
+          <Statics statics={statics} forwardStatus={useForwarding} />
         </div>
-        
-        <div className="flex items-center gap-2 border-l pl-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="breakpoint-input" className="whitespace-nowrap">Breakpoint:</Label>
-            <Input
-              id="breakpoint-input"
-              type="number"
-              className="w-16 h-9"
-              value={breakpoint}
-              onChange={(e) => {
-                setBreakpoint(parseInt(e.target.value) || 0);
-              }}
+
+        {/* Right column (3/5 width) */}
+        <div className="lg:col-span-3 flex flex-col gap-6">
+          <InstructionList instructions={instWithStage} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <MemoryViewer memory={pipelineRef.current.mem} />
+            <RegisterFileViewer
+              registerFile={pipelineRef.current.registerFile}
             />
           </div>
-          <Button 
-            onClick={() => handleTick(breakpoint)} 
-            variant="outline"
-            disabled={breakpoint === 0}
-            className="whitespace-nowrap"
-          >
-            Run to BP
-          </Button>
-        </div>
-        
-        <div className="flex items-center gap-2 border-l pl-4">
-          <Button onClick={handleReset} variant="destructive" size="sm">
-            Reset
-          </Button>
-        </div>
-        
-        <div className="flex items-center gap-2 border-l pl-4">
-          <Switch
-            id="forward-mode"
-            checked={useForwarding}
-            onCheckedChange={handleForwardingChange}
-          />
-          <Label htmlFor="forward-mode" className="cursor-pointer">Forward Mode</Label>
         </div>
       </div>
-      <div className="flex gap-2">
-        <InstructionList instructions={instWithStage} />
-        <PipelineView pipelineRegs={pipelineRegs} />
-      </div>
-      <div className="flex gap-2">
-        <MemoryViewer memory={pipelineRef.current.mem} />
-        <RegisterFileViewer registerFile={pipelineRef.current.registerFile} />
-      </div>
-      <Statics statics={statics} forwardStatus={useForwarding} />
 
-      <InstructionInput onChange={handleSetIMem} />
+      {/* Bottom section: Instruction input */}
+      <div className="mt-6">
+        <InstructionInput onChange={handleSetIMem} />
+      </div>
     </div>
   );
 }
