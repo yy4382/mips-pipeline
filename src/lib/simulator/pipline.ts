@@ -5,59 +5,24 @@ import {
   InstructionMemory,
   LoadSaveInstruction,
 } from "./instruction";
-import { Memory } from "./memory";
-import { RegisterFile } from "./register-file";
-
-export type PipelineRegs = {
-  mem2wb: {
-    inst: Instruction;
-    mem: number;
-    alu: number;
-  };
-  ex2mem: {
-    inst: Instruction;
-    alu_out: number;
-    write_data: number;
-  };
-  id2ex: {
-    inst: Instruction;
-    reg1: number;
-    reg2: number;
-    pc: number;
-    immediate: number;
-  };
-  if2id: {
-    inst: Instruction;
-    pc: number;
-  };
-};
-
-function getDefaultPipelineRegs(): PipelineRegs {
-  return {
-    mem2wb: { inst: Instruction.default(), mem: 0, alu: 0 },
-    ex2mem: { inst: Instruction.default(), alu_out: 0, write_data: 0 },
-    id2ex: {
-      inst: Instruction.default(),
-      reg1: 0,
-      reg2: 0,
-      pc: 0,
-      immediate: 0,
-    },
-    if2id: { inst: Instruction.default(), pc: 0 },
-  };
-}
+import { Memory } from "./hardware/memory";
+import { RegisterFile } from "./hardware/register-file";
+import {
+  getDefaultPipelineRegs,
+  PipelineRegs,
+} from "./hardware/pipeline-registers";
 
 export class Pipeline {
   /**
    * pc is similar to PC in CPU, but it steps 1 by 1, instead of 4 by 4.
    * it represents the next instruction's address (index in the instruction array)
    */
-  public pc: number;
-  public registerFile: RegisterFile;
-  public iMem: InstructionMemory;
-  public mem: Memory;
-  public pipelineRegs: PipelineRegs;
-  public readonly forwarding: boolean;
+  pc: number;
+  registerFile: RegisterFile;
+  iMem: InstructionMemory;
+  mem: Memory;
+  pipelineRegs: PipelineRegs;
+  readonly forwarding: boolean;
 
   constructor(iMem: InstructionMemory, forwading: boolean = false) {
     this.pc = 0;
@@ -248,68 +213,79 @@ function calculateHazards(pipelineRegs: PipelineRegs): boolean {
   }
 }
 
+/**
+ * Checks for data hazards for a specific source register and determines
+ * if forwarding is possible or if a stall is needed.
+ * @param sourceRegIndex The index of the source register (rs1 or rs2) in the ID stage.
+ * @param pipelineRegs The current pipeline registers.
+ * @returns An object indicating if a stall is needed and the value to forward, if any.
+ */
+function checkForwardingForRegister(
+  sourceRegIndex: number | undefined,
+  pipelineRegs: PipelineRegs
+): { needsStall: boolean; forwardedValue?: number } {
+  // Check EX/MEM stage for collision
+  if (regIndexCollision(sourceRegIndex, pipelineRegs.ex2mem.inst.rd)) {
+    // Load-use hazard: LW instruction in EX/MEM, data not ready yet.
+    if (pipelineRegs.ex2mem.inst instanceof LoadSaveInstruction) {
+      return { needsStall: true };
+    }
+    // Forward ALU result from EX/MEM stage
+    return { needsStall: false, forwardedValue: pipelineRegs.ex2mem.alu_out };
+  }
+
+  // Check MEM/WB stage for collision
+  if (regIndexCollision(sourceRegIndex, pipelineRegs.mem2wb.inst.rd)) {
+    // Forward data loaded from memory in MEM/WB stage
+    if (pipelineRegs.mem2wb.inst instanceof LoadSaveInstruction) {
+      return { needsStall: false, forwardedValue: pipelineRegs.mem2wb.mem };
+    }
+    // Forward ALU result from MEM/WB stage
+    if (pipelineRegs.mem2wb.inst instanceof ArithmeticInstruction) {
+      return { needsStall: false, forwardedValue: pipelineRegs.mem2wb.alu };
+    }
+    // Should ideally not happen with supported instruction types writing to rd
+    console.warn(
+      "Unhandled instruction type in MEM/WB for forwarding:",
+      pipelineRegs.mem2wb.inst.raw
+    );
+  }
+
+  // No hazard detected for this register
+  return { needsStall: false };
+}
+
+/**
+ * Attempts to forward data from later pipeline stages (EX/MEM, MEM/WB)
+ * to the ID/EX stage to resolve data hazards.
+ * Modifies pipelineRegs.id2ex.reg1 and pipelineRegs.id2ex.reg2 if forwarding occurs.
+ * @param pipelineRegs The pipeline registers (will be modified).
+ * @returns True if a stall is required (due to a load-use hazard), false otherwise.
+ */
 function tryForward(pipelineRegs: PipelineRegs): boolean {
-  function forRs1() {
-    if (
-      regIndexCollision(
-        pipelineRegs.id2ex.inst.rs1,
-        pipelineRegs.ex2mem.inst.rd
-      )
-    ) {
-      if (pipelineRegs.ex2mem.inst instanceof LoadSaveInstruction) {
-        return true;
-      }
-      pipelineRegs.id2ex.reg1 = pipelineRegs.ex2mem.alu_out;
-      return false;
-    }
-    if (
-      regIndexCollision(
-        pipelineRegs.id2ex.inst.rs1,
-        pipelineRegs.mem2wb.inst.rd
-      )
-    ) {
-      if (pipelineRegs.mem2wb.inst instanceof LoadSaveInstruction) {
-        pipelineRegs.id2ex.reg1 = pipelineRegs.mem2wb.mem;
-        return false;
-      }
-      if (pipelineRegs.mem2wb.inst instanceof ArithmeticInstruction) {
-        pipelineRegs.id2ex.reg1 = pipelineRegs.mem2wb.alu;
-        return false;
-      }
-      throw new Error("Unknown instruction type");
-    }
-    return false;
+  const resultRs1 = checkForwardingForRegister(
+    pipelineRegs.id2ex.inst.rs1,
+    pipelineRegs
+  );
+  const resultRs2 = checkForwardingForRegister(
+    pipelineRegs.id2ex.inst.rs2,
+    pipelineRegs
+  );
+
+  // Apply forwarding if a value was returned
+  if (resultRs1.forwardedValue !== undefined) {
+    pipelineRegs.id2ex.reg1 = resultRs1.forwardedValue;
+    console.debug(
+      `Forwarding value ${resultRs1.forwardedValue} to reg1 for ${pipelineRegs.id2ex.inst.raw}`
+    );
   }
-  function forRs2(): boolean {
-    if (
-      regIndexCollision(
-        pipelineRegs.id2ex.inst.rs2,
-        pipelineRegs.ex2mem.inst.rd
-      )
-    ) {
-      if (pipelineRegs.ex2mem.inst instanceof LoadSaveInstruction) {
-        return true;
-      }
-      pipelineRegs.id2ex.reg2 = pipelineRegs.ex2mem.alu_out;
-      return false;
-    }
-    if (
-      regIndexCollision(
-        pipelineRegs.id2ex.inst.rs2,
-        pipelineRegs.mem2wb.inst.rd
-      )
-    ) {
-      if (pipelineRegs.mem2wb.inst instanceof LoadSaveInstruction) {
-        pipelineRegs.id2ex.reg2 = pipelineRegs.mem2wb.mem;
-        return false;
-      }
-      if (pipelineRegs.mem2wb.inst instanceof ArithmeticInstruction) {
-        pipelineRegs.id2ex.reg2 = pipelineRegs.mem2wb.alu;
-        return false;
-      }
-      throw new Error("Unknown instruction type");
-    }
-    return false;
+  if (resultRs2.forwardedValue !== undefined) {
+    pipelineRegs.id2ex.reg2 = resultRs2.forwardedValue;
+    console.debug(
+      `Forwarding value ${resultRs2.forwardedValue} to reg2 for ${pipelineRegs.id2ex.inst.raw}`
+    );
   }
-  return forRs1() || forRs2();
+
+  // Stall if either register check indicated a load-use hazard
+  return resultRs1.needsStall || resultRs2.needsStall;
 }

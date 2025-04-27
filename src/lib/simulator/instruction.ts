@@ -56,7 +56,6 @@ class Instruction {
           throw new Error(`Invalid address format: ${args[1]}`);
         }
         const reg = addressParts[1].substring(0, addressParts[1].length - 1);
-        console.log(reg);
         if (reg.charAt(0) !== "$") {
           throw new Error(`Invalid register format: ${addressParts[1]}`);
         }
