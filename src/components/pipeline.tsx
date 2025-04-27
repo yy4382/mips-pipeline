@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { MemoryViewer } from "./memory-viewer";
 import { RegisterFileViewer } from "./register-file-viewer";
 import { Statics } from "./statics";
+import { Input } from "./ui/input";
 
 const DEFAULT_INSTRUCTION = `
 load $1, 0($0)
@@ -39,6 +40,8 @@ export function PipelineComp() {
   const pipelineRef = useRef<Pipeline>(
     new Pipeline(InstructionMemory.parse(DEFAULT_INSTRUCTION), useForwarding)
   );
+
+  const [breakpoint, setBreakpoint] = useState<number>(0);
 
   const [instWithStage, setInstWithStage] = useState<InstWithStage[]>(
     parseInstWithStage(pipelineRef.current)
@@ -80,8 +83,8 @@ export function PipelineComp() {
     setStatics({ ...pipelineRef.current.statics });
   };
 
-  const handleTick = () => {
-    pipelineRef.current.tick(1, hazardCallback, forwardCallback);
+  const handleTick = (stopAt: number | undefined) => {
+    pipelineRef.current.tick(stopAt, hazardCallback, forwardCallback);
     handlePipelineChange();
   };
 
@@ -102,18 +105,48 @@ export function PipelineComp() {
 
   return (
     <div className="flex flex-col gap-4 items-center">
-      <div className="flex gap-2">
-        <Button onClick={handleTick}>Tick</Button>
-        <Button onClick={handleReset} variant="destructive">
-          Reset
-        </Button>
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-wrap gap-4 items-center justify-center p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 w-fit mx-auto">
+        <div className="flex gap-2">
+          <Button onClick={() => handleTick(undefined)}>Step</Button>
+          <Button onClick={() => handleTick(-1)}>Run to End</Button>
+        </div>
+        
+        <div className="flex items-center gap-2 border-l pl-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="breakpoint-input" className="whitespace-nowrap">Breakpoint:</Label>
+            <Input
+              id="breakpoint-input"
+              type="number"
+              className="w-16 h-9"
+              value={breakpoint}
+              onChange={(e) => {
+                setBreakpoint(parseInt(e.target.value) || 0);
+              }}
+            />
+          </div>
+          <Button 
+            onClick={() => handleTick(breakpoint)} 
+            variant="outline"
+            disabled={breakpoint === 0}
+            className="whitespace-nowrap"
+          >
+            Run to BP
+          </Button>
+        </div>
+        
+        <div className="flex items-center gap-2 border-l pl-4">
+          <Button onClick={handleReset} variant="destructive" size="sm">
+            Reset
+          </Button>
+        </div>
+        
+        <div className="flex items-center gap-2 border-l pl-4">
           <Switch
             id="forward-mode"
             checked={useForwarding}
             onCheckedChange={handleForwardingChange}
           />
-          <Label htmlFor="forward-mode">Forward Mode</Label>
+          <Label htmlFor="forward-mode" className="cursor-pointer">Forward Mode</Label>
         </div>
       </div>
       <div className="flex gap-2">

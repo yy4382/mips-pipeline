@@ -60,14 +60,43 @@ export class Pipeline {
     };
   }
 
+  /**
+   *
+   * @param stopAt undefined means run 1 tick, -1 means runs to end, other means runs to IF of that inst
+   * @param hazardCallback
+   * @param forwardCb
+   */
   tick(
-    nTimes: number = 1,
+    stopAt: number | undefined = undefined,
     hazardCallback: HazardCallback = () => {},
     forwardCb: (arg: ForwardDetail) => void = () => {}
   ) {
-    for (let i = 0; i < nTimes; i++) {
+    if (stopAt === undefined) {
+      this._tick(hazardCallback, forwardCb);
+      return;
+    }
+    if (stopAt === -1) {
+      while (!this.isFinished()) {
+        this._tick(hazardCallback, forwardCb);
+      }
+      return;
+    }
+    while (
+      this.iMem.getInstructionAt(this.pc).originalIndex !== stopAt &&
+      !this.isFinished()
+    ) {
       this._tick(hazardCallback, forwardCb);
     }
+  }
+
+  isFinished(): boolean {
+    return (
+      this.pipelineRegs.if2id.inst.originalIndex === undefined &&
+      this.pipelineRegs.id2ex.inst.originalIndex === undefined &&
+      this.pipelineRegs.ex2mem.inst.originalIndex === undefined &&
+      this.pipelineRegs.mem2wb.inst.originalIndex === undefined &&
+      this.iMem.getInstructionAt(this.pc).originalIndex === undefined
+    );
   }
 
   _tick(
