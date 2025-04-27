@@ -112,7 +112,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
   };
 
   return (
-    <div className="p-4 border rounded-md w-100">
+    <div className="p-4 border rounded-md w-full max-w-120">
       <h2 className="text-lg font-semibold mb-2">Memory Contents</h2>
       <ScrollArea className="h-[400px] w-full">
         {" "}

@@ -16,7 +16,7 @@ export function InstructionList({
   instructions: InstWithStage[];
 }) {
   return (
-    <Card className="w-100">
+    <Card className="w-full max-w-120 min-w-100">
       <CardHeader>
         <h2 className="text-lg font-semibold">Instruction List</h2>
       </CardHeader>

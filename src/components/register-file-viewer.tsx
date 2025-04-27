@@ -30,7 +30,7 @@ export const RegisterFileViewer: React.FC<RegisterFileViewerProps> = ({
   }, [registerFile]);
 
   return (
-    <Card className="w-100">
+    <Card className="w-full max-w-120">
       <CardHeader>
         <CardTitle>Register File</CardTitle>
       </CardHeader>

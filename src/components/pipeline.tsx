@@ -97,7 +97,7 @@ export function PipelineComp() {
   };
 
   return (
-    <div className="flex flex-col gap-4 mx-auto w-fit">
+    <div className="flex flex-col gap-4 items-center">
       <div className="flex gap-2">
         <Button onClick={handleTick}>Tick</Button>
         <Button onClick={handleReset} variant="destructive">
