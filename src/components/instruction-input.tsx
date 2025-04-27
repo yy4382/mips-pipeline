@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Textarea } from "./ui/textarea";
 
 export function InstructionInput({
   onChange,
@@ -20,7 +21,7 @@ export function InstructionInput({
         Instruction
       </label>
       <div className="flex items-end space-x-2">
-        <textarea
+        <Textarea
           id="instruction-input"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}

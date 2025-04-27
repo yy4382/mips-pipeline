@@ -8,23 +8,24 @@ import {
 import { InstructionList } from "./instruction-list";
 import { PipelineView } from "./pipeline-view";
 import { InstructionInput } from "./instruction-input";
+import { Button } from "./ui/button";
+
+const DEFAULT_INSTRUCTION = `
+load $1, 0($0)
+load $2, 1($0)
+add $0, $0, $0
+add $0, $0, $0
+add $0, $0, $0
+add $3, $1, $2
+add $0, $0, $0
+add $0, $0, $0
+add $0, $0, $0
+store $3, 2($0)
+`;
 
 export function PipelineComp() {
   const pipelineRef = useRef<Pipeline>(
-    new Pipeline(
-      InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
-    add $0, $0, $0
-    add $0, $0, $0
-    add $0, $0, $0
-    add $3, $1, $2
-    add $0, $0, $0
-    add $0, $0, $0
-    add $0, $0, $0
-    store $3, 2($0)
-    `)
-    )
+    new Pipeline(InstructionMemory.parse(DEFAULT_INSTRUCTION))
   );
 
   const [instWithStage, setInstWithStage] = useState<InstWithStage[]>(
@@ -55,13 +56,12 @@ export function PipelineComp() {
 
   return (
     <div className="flex flex-col gap-4">
-      <button
-        onClick={handleTick}
-        className="bg-blue-500 text-white p-2 rounded"
-      >
-        Tick
-      </button>
-      <button onClick={handleReset}>Reset</button>
+      <div className="flex gap-2">
+        <Button onClick={handleTick}>Tick</Button>
+        <Button onClick={handleReset} variant="destructive">
+          Reset
+        </Button>
+      </div>
 
       <InstructionList instructions={instWithStage} />
       <PipelineView pipelineRegs={pipelineRegs} />

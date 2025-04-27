@@ -1,4 +1,14 @@
-import { InstWithStage } from "../lib/pipeline-parsers/instruction-list";
+import { InstWithStage } from "@/lib/pipeline-parsers/instruction-list";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { ScrollArea } from "./ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 export function InstructionList({
   instructions,
@@ -6,22 +16,32 @@ export function InstructionList({
   instructions: InstWithStage[];
 }) {
   return (
-    <div className="flex flex-col gap-2 w-96">
-      {instructions.map((inst, index) => (
-        <div
-          key={index}
-          className={`flex items-center justify-between gap-2 p-2 rounded-md border ${
-            inst.stage ? "bg-blue-100 border-blue-300" : "bg-white border-gray-200"
-          }`}
-        >
-          <span className="font-mono">{inst.inst.raw}</span>
-          {inst.stage && (
-            <span className="text-xs font-semibold uppercase px-2 py-1 bg-blue-500 text-white rounded-full">
-              {inst.stage}
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
+    <Card className="w-96">
+      <CardHeader>
+        <h2 className="text-lg font-semibold">Instruction List</h2>
+      </CardHeader>
+      <CardContent>
+        <ScrollArea className="h-82">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16">Index</TableHead>
+                <TableHead>Instruction</TableHead>
+                <TableHead className="w-16">Stage</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {instructions.map((inst, index) => (
+                <TableRow key={index}>
+                  <TableCell>{inst.inst.originalIndex}</TableCell>
+                  <TableCell>{inst.inst.raw}</TableCell>
+                  <TableCell>{inst.stage ?? ""}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 }

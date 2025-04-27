@@ -7,12 +7,16 @@ export type InstWithStage = {
 };
 
 export function parseInstWithStage(pipeline: Pipeline): InstWithStage[] {
-  const ifIndex = pipeline.iMem.getInstructionAt(pipeline.pc).originalIndex;
-  const idIndex = pipeline.pipelineRegs.if2id.inst.originalIndex;
-  const exIndex = pipeline.pipelineRegs.id2ex.inst.originalIndex;
-  const memIndex = pipeline.pipelineRegs.ex2mem.inst.originalIndex;
-  const wbIndex = pipeline.pipelineRegs.mem2wb.inst.originalIndex;
-  console.log(ifIndex, idIndex, exIndex, memIndex, wbIndex);
+  const stageIndices: Record<
+    NonNullable<InstWithStage["stage"]>,
+    number | undefined
+  > = {
+    if: pipeline.iMem.getInstructionAt(pipeline.pc).originalIndex,
+    id: pipeline.pipelineRegs.if2id.inst.originalIndex,
+    ex: pipeline.pipelineRegs.id2ex.inst.originalIndex,
+    mem: pipeline.pipelineRegs.ex2mem.inst.originalIndex,
+    wb: pipeline.pipelineRegs.mem2wb.inst.originalIndex,
+  };
 
   const results = pipeline.iMem.instructions.map(
     (inst) =>
@@ -21,20 +25,12 @@ export function parseInstWithStage(pipeline: Pipeline): InstWithStage[] {
         stage: undefined,
       } as InstWithStage)
   );
-  if (ifIndex !== undefined) {
-    results[ifIndex].stage = "if";
+
+  for (const [stage, index] of Object.entries(stageIndices)) {
+    if (index !== undefined && index >= 0 && index < results.length) {
+      results[index].stage = stage as NonNullable<InstWithStage["stage"]>;
+    }
   }
-  if (idIndex !== undefined) {
-    results[idIndex].stage = "id";
-  }
-  if (exIndex !== undefined) {
-    results[exIndex].stage = "ex";
-  }
-  if (memIndex !== undefined) {
-    results[memIndex].stage = "mem";
-  }
-  if (wbIndex !== undefined) {
-    results[wbIndex].stage = "wb";
-  }
+
   return results;
 }
