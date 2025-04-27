@@ -1,9 +1,11 @@
 import { PipelineComp } from "./components/pipeline";
-import { Toaster } from "@/components/ui/sonner"
+import { Toaster } from "@/components/ui/sonner";
 function App() {
   return (
     <>
-      <PipelineComp />
+      <div className="">
+        <PipelineComp />
+      </div>
       <Toaster />
     </>
   );

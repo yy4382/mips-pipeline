@@ -16,6 +16,8 @@ import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { MemoryViewer } from "./memory-viewer";
+import { RegisterFileViewer } from "./register-file-viewer";
 
 const DEFAULT_INSTRUCTION = `
 load $1, 0($0)
@@ -95,7 +97,7 @@ export function PipelineComp() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 mx-auto w-fit">
       <div className="flex gap-2">
         <Button onClick={handleTick}>Tick</Button>
         <Button onClick={handleReset} variant="destructive">
@@ -110,9 +112,14 @@ export function PipelineComp() {
           <Label htmlFor="forward-mode">Forward Mode</Label>
         </div>
       </div>
-
-      <InstructionList instructions={instWithStage} />
-      <PipelineView pipelineRegs={pipelineRegs} />
+      <div className="flex gap-2">
+        <InstructionList instructions={instWithStage} />
+        <PipelineView pipelineRegs={pipelineRegs} />
+      </div>
+      <div className="flex gap-2">
+        <MemoryViewer memory={pipelineRef.current.mem} />
+        <RegisterFileViewer registerFile={pipelineRef.current.registerFile} />
+      </div>
       <InstructionInput onChange={handleSetIMem} />
     </div>
   );
