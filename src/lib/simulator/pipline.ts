@@ -12,6 +12,17 @@ import {
   PipelineRegs,
 } from "./hardware/pipeline-registers";
 
+export type HazardCallback = (
+  type: "branch" | "data",
+  cause: { inst: Instruction; desc: string }
+) => void;
+
+export type ForwardDetail = {
+  target: { inst: Instruction; regIndex: number };
+  source: { inst: Instruction; regIndex: number };
+  data: number;
+};
+
 export class Pipeline {
   /**
    * pc is similar to PC in CPU, but it steps 1 by 1, instead of 4 by 4.
@@ -22,7 +33,7 @@ export class Pipeline {
   iMem: InstructionMemory;
   mem: Memory;
   pipelineRegs: PipelineRegs;
-  readonly forwarding: boolean;
+  forwarding: boolean;
 
   constructor(iMem: InstructionMemory, forwading: boolean = false) {
     this.pc = 0;
@@ -33,13 +44,20 @@ export class Pipeline {
     this.forwarding = forwading;
   }
 
-  tick(nTimes: number = 1) {
+  tick(
+    nTimes: number = 1,
+    hazardCallback: HazardCallback = () => {},
+    forwardCb: (arg: ForwardDetail) => void = () => {}
+  ) {
     for (let i = 0; i < nTimes; i++) {
-      this._tick();
+      this._tick(hazardCallback, forwardCb);
     }
   }
 
-  _tick() {
+  _tick(
+    hazardCallback: HazardCallback = () => {},
+    forwardCb: (arg: ForwardDetail) => void = () => {}
+  ) {
     const newPipelineRegs = getDefaultPipelineRegs();
 
     this.writeBackStage(this.pipelineRegs.mem2wb);
@@ -53,6 +71,11 @@ export class Pipeline {
       console.debug(
         `branch taken: ${newPipelineRegs.ex2mem.inst.raw} pc: ${this.pipelineRegs.id2ex.pc}(now at ${this.pc}) -> ${newPipelineRegs.ex2mem.alu_out}`
       );
+      hazardCallback("branch", {
+        inst: newPipelineRegs.ex2mem.inst,
+        desc: "branch prediction failed, flushed the first two stages`",
+      });
+
       // flush the pipeline (making the just-run instructions in IF and ID into NOP)
       newPipelineRegs.id2ex = getDefaultPipelineRegs().id2ex;
       newPipelineRegs.if2id = getDefaultPipelineRegs().if2id;
@@ -60,12 +83,17 @@ export class Pipeline {
     } else {
       let hazard;
       if (this.forwarding) {
-        hazard = tryForward(newPipelineRegs);
+        hazard = tryForward(newPipelineRegs, forwardCb);
       } else {
         hazard = calculateHazards(newPipelineRegs);
       }
       if (hazard) {
         console.debug(`hazard detected: ${hazard}`);
+        hazardCallback("data", {
+          inst: newPipelineRegs.id2ex.inst,
+          desc: "data hazard detected, inserted a bubble to ID/EX registers and prevented first two stages to move on",
+        });
+
         // insert a bubble
         newPipelineRegs.id2ex = getDefaultPipelineRegs().id2ex;
         // keeps the IF to ID stage registers and PC unchanged
@@ -93,6 +121,11 @@ export class Pipeline {
   setIMem(iMem: InstructionMemory) {
     this.reset();
     this.iMem = iMem;
+  }
+
+  setForwarding(forwarding: boolean) {
+    this.forwarding = forwarding;
+    this.reset();
   }
 
   writeBackStage({
@@ -223,7 +256,7 @@ function calculateHazards(pipelineRegs: PipelineRegs): boolean {
 function checkForwardingForRegister(
   sourceRegIndex: number | undefined,
   pipelineRegs: PipelineRegs
-): { needsStall: boolean; forwardedValue?: number } {
+): { needsStall: boolean; forwardDetail?: Omit<ForwardDetail, "target"> } {
   // Check EX/MEM stage for collision
   if (regIndexCollision(sourceRegIndex, pipelineRegs.ex2mem.inst.rd)) {
     // Load-use hazard: LW instruction in EX/MEM, data not ready yet.
@@ -231,18 +264,45 @@ function checkForwardingForRegister(
       return { needsStall: true };
     }
     // Forward ALU result from EX/MEM stage
-    return { needsStall: false, forwardedValue: pipelineRegs.ex2mem.alu_out };
+    return {
+      needsStall: false,
+      forwardDetail: {
+        source: {
+          inst: pipelineRegs.ex2mem.inst,
+          regIndex: pipelineRegs.ex2mem.inst.rd!,
+        },
+        data: pipelineRegs.ex2mem.alu_out,
+      },
+    };
   }
 
   // Check MEM/WB stage for collision
   if (regIndexCollision(sourceRegIndex, pipelineRegs.mem2wb.inst.rd)) {
     // Forward data loaded from memory in MEM/WB stage
     if (pipelineRegs.mem2wb.inst instanceof LoadSaveInstruction) {
-      return { needsStall: false, forwardedValue: pipelineRegs.mem2wb.mem };
+      return {
+        needsStall: false,
+        forwardDetail: {
+          source: {
+            inst: pipelineRegs.mem2wb.inst,
+            regIndex: pipelineRegs.mem2wb.inst.rd!,
+          },
+          data: pipelineRegs.mem2wb.mem,
+        },
+      };
     }
     // Forward ALU result from MEM/WB stage
     if (pipelineRegs.mem2wb.inst instanceof ArithmeticInstruction) {
-      return { needsStall: false, forwardedValue: pipelineRegs.mem2wb.alu };
+      return {
+        needsStall: false,
+        forwardDetail: {
+          source: {
+            inst: pipelineRegs.mem2wb.inst,
+            regIndex: pipelineRegs.mem2wb.inst.rd!,
+          },
+          data: pipelineRegs.mem2wb.alu,
+        },
+      };
     }
     // Should ideally not happen with supported instruction types writing to rd
     console.warn(
@@ -262,7 +322,10 @@ function checkForwardingForRegister(
  * @param pipelineRegs The pipeline registers (will be modified).
  * @returns True if a stall is required (due to a load-use hazard), false otherwise.
  */
-function tryForward(pipelineRegs: PipelineRegs): boolean {
+function tryForward(
+  pipelineRegs: PipelineRegs,
+  forwardCb: (arg: ForwardDetail) => void
+): boolean {
   const resultRs1 = checkForwardingForRegister(
     pipelineRegs.id2ex.inst.rs1,
     pipelineRegs
@@ -272,20 +335,34 @@ function tryForward(pipelineRegs: PipelineRegs): boolean {
     pipelineRegs
   );
 
-  // Apply forwarding if a value was returned
-  if (resultRs1.forwardedValue !== undefined) {
-    pipelineRegs.id2ex.reg1 = resultRs1.forwardedValue;
-    console.debug(
-      `Forwarding value ${resultRs1.forwardedValue} to reg1 for ${pipelineRegs.id2ex.inst.raw}`
-    );
-  }
-  if (resultRs2.forwardedValue !== undefined) {
-    pipelineRegs.id2ex.reg2 = resultRs2.forwardedValue;
-    console.debug(
-      `Forwarding value ${resultRs2.forwardedValue} to reg2 for ${pipelineRegs.id2ex.inst.raw}`
-    );
+  if (resultRs1.needsStall || resultRs2.needsStall) {
+    return true; // Stall needed
   }
 
-  // Stall if either register check indicated a load-use hazard
-  return resultRs1.needsStall || resultRs2.needsStall;
+  // Apply forwarding if a value was returned
+  if (resultRs1.forwardDetail !== undefined) {
+    pipelineRegs.id2ex.reg1 = resultRs1.forwardDetail.data;
+    const detail: ForwardDetail = {
+      ...resultRs1.forwardDetail,
+      target: {
+        inst: pipelineRegs.id2ex.inst,
+        regIndex: pipelineRegs.id2ex.inst.rs1!,
+      },
+    };
+    forwardCb(detail);
+    console.debug(detail);
+  }
+  if (resultRs2.forwardDetail !== undefined) {
+    pipelineRegs.id2ex.reg2 = resultRs2.forwardDetail.data;
+    const detail: ForwardDetail = {
+      ...resultRs2.forwardDetail,
+      target: {
+        inst: pipelineRegs.id2ex.inst,
+        regIndex: pipelineRegs.id2ex.inst.rs2!,
+      },
+    };
+    forwardCb(detail);
+    console.debug(detail);
+  }
+  return false; // No stall needed
 }
