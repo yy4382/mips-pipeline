@@ -116,14 +116,15 @@ export class Instruction {
             `Invalid number of arguments for ${instructionType} instruction`
           );
         }
-        args.forEach((arg) => {
+        args.forEach((arg, i) => {
+          if (i >= 2) return;
           if (arg.charAt(0) !== "$" || isNaN(parseInt(arg.substring(1)))) {
             throw new Error(`Invalid register format: ${arg}`);
           }
         });
+        const resultRegisterIndex = parseInt(args[0].substring(1));
         const registerIndex = parseInt(args[1].substring(1));
         const immediate = parseInt(args[2]);
-        const resultRegisterIndex = parseInt(args[0].substring(1));
         return AddiInstruction.fromIInstruction(
           IInstruction.fromInstruction(
             baseInstruction,
@@ -133,7 +134,8 @@ export class Instruction {
           )
         );
       }
-      case "beqz": {
+      case "beqz":
+      case "bnez": {
         if (args.length !== 2) {
           throw new Error(
             `Invalid number of arguments for ${instructionType} instruction`
@@ -141,15 +143,75 @@ export class Instruction {
         }
         const registerIndex = parseInt(args[0].substring(1));
         const offset = parseInt(args[1]);
-        return BeqInstruction.fromIInstruction(
-          IInstruction.fromInstruction(
-            baseInstruction,
-            registerIndex,
-            0,
-            offset
-          )
-        );
+        if (instructionType === "beqz") {
+          return BeqInstruction.fromIInstruction(
+            IInstruction.fromInstruction(
+              baseInstruction,
+              registerIndex,
+              0,
+              offset
+            )
+          );
+        } else {
+          return BneInstruction.fromIInstruction(
+            IInstruction.fromInstruction(
+              baseInstruction,
+              registerIndex,
+              0,
+              offset
+            )
+          );
+        }
       }
+      case "beq":
+      case "bne": {
+        if (args.length !== 3) {
+          throw new Error(
+            `Invalid number of arguments for ${instructionType} instruction`
+          );
+        }
+        if (
+          args[0].charAt(0) !== "$" ||
+          isNaN(parseInt(args[0].substring(1)))
+        ) {
+          throw new Error(`Invalid register format: ${args[0]}`);
+        }
+        const registerIndex1 = parseInt(args[0].substring(1));
+        if (
+          args[1].charAt(0) !== "$" ||
+          isNaN(parseInt(args[1].substring(1)))
+        ) {
+          throw new Error(`Invalid register format: ${args[1]}`);
+        }
+        const registerIndex2 = parseInt(args[1].substring(1));
+        if (isNaN(parseInt(args[2]))) {
+          throw new Error(`Invalid offset format: ${args[2]}`);
+        }
+        const offset = parseInt(args[2]);
+        if (instructionType === "beq") {
+          return BeqInstruction.fromIInstruction(
+            IInstruction.fromInstruction(
+              baseInstruction,
+              registerIndex1,
+              registerIndex2,
+              offset
+            )
+          );
+        } else {
+          return BneInstruction.fromIInstruction(
+            IInstruction.fromInstruction(
+              baseInstruction,
+              registerIndex1,
+              registerIndex2,
+              offset
+            )
+          );
+        }
+      }
+      case "nop": {
+        return Instruction.default();
+      }
+
       default:
         throw new Error(`Unknown instruction type: ${instructionType}`);
     }
@@ -297,12 +359,33 @@ export class SwInstruction extends IInstruction {
   }
 }
 
-export class BeqInstruction extends IInstruction {
+class BranchInstruction extends IInstruction {
+  branchController(_reg1: number, _reg2: number): boolean {
+    throw new Error("branchController unimplemented");
+  }
+
   get readingRegisters(): [number | undefined, number | undefined] {
     return [this.rs1, this.rd];
   }
   get writingRegister(): number | undefined {
     return undefined;
+  }
+  get controlSignals(): ControlSignals {
+    return {
+      branchController: this.branchController,
+      aSel: "pc",
+      bSel: "immediate",
+      aluOp: "add",
+      memWriteEnable: false,
+      wbSel: "alu", // doesn't matter
+      regWriteEnable: false,
+    };
+  }
+}
+
+export class BeqInstruction extends BranchInstruction {
+  branchController(_reg1: number, _reg2: number): boolean {
+    return _reg1 === _reg2;
   }
   static fromIInstruction(inst: IInstruction): BeqInstruction {
     return new BeqInstruction(
@@ -313,16 +396,20 @@ export class BeqInstruction extends IInstruction {
       inst.originalIndex
     );
   }
-  get controlSignals(): ControlSignals {
-    return {
-      branchController: (reg1: number, reg2: number) => reg1 === reg2,
-      aSel: "pc",
-      bSel: "immediate",
-      aluOp: "add",
-      memWriteEnable: false,
-      wbSel: "alu", // doesn't matter
-      regWriteEnable: false,
-    };
+}
+
+export class BneInstruction extends BranchInstruction {
+  branchController(_reg1: number, _reg2: number): boolean {
+    return _reg1 !== _reg2;
+  }
+  static fromIInstruction(inst: IInstruction): BneInstruction {
+    return new BneInstruction(
+      inst.rs1,
+      inst.rd,
+      inst.immediate,
+      inst.raw,
+      inst.originalIndex
+    );
   }
 }
 
