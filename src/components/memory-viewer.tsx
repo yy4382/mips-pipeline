@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Memory } from "@/lib/simulator/hardware/memory";
+
 import {
   Table,
   TableBody,
@@ -9,42 +9,28 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 
 interface MemoryViewerProps {
-  memory: Memory;
-  rows?: number; // Optional prop to limit displayed rows
+  memory: readonly number[];
+  setMemory: (i: number, value: number) => void;
 }
 
-export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
-  const memorySize = rows ?? memory.getSize();
+export const MemoryViewer: React.FC<MemoryViewerProps> = ({
+  memory,
+  setMemory,
+}) => {
   // Initialize local state directly from the memory instance
   const [editableMemory, setEditableMemory] = useState<string[]>(() =>
-    memory.getMemory().slice(0, memorySize).map(String)
+    memory.slice().map(String)
   );
 
   // Effect to subscribe to memory changes on mount and unsubscribe on unmount
   useEffect(() => {
     // Define the listener callback
-    const handleMemoryChange = (newMemoryState: readonly number[]) => {
-      // Update local state based on the notified change
-      setEditableMemory(newMemoryState.slice(0, memorySize).map(String));
-    };
-
-    // Subscribe the listener
-    const unsubscribe = memory.subscribe(handleMemoryChange);
-
-    // Update state immediately in case memory changed between initial render and effect run
-    handleMemoryChange(memory.getMemory());
-
-    // Return the cleanup function to unsubscribe
-    return () => {
-      unsubscribe();
-    };
-    // Dependencies: memory instance and memorySize (if it can change)
-  }, [memory, memorySize]);
+    setEditableMemory(memory.slice().map(String));
+  }, [memory]);
 
   const handleInputChange = useCallback((index: number, value: string) => {
     setEditableMemory((prev) => {
@@ -60,12 +46,12 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
       const valueNum = parseInt(valueStr, 10); // Or parseFloat if needed
 
       // Get the current value *before* attempting to set, for comparison/revert
-      const currentValueInMemory = memory.getAt(index);
+      const currentValueInMemory = memory.at(index);
 
       if (!isNaN(valueNum)) {
         try {
           // This will trigger the notification if the value actually changes
-          memory.setAt(index, valueNum);
+          setMemory(index, valueNum);
           // No need to manually setEditableMemory here, the subscription handles it
           console.log(
             `Attempted to save value ${valueNum} at address ${index}`
@@ -76,7 +62,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
           // Note: The subscription might have already updated if setAt partially succeeded before error
           setEditableMemory((prev) => {
             const newState = [...prev];
-            newState[index] = currentValueInMemory.toString(); // Revert to original value
+            newState[index] = currentValueInMemory?.toString() ?? ""; // Revert to original value
             return newState;
           });
         }
@@ -87,7 +73,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
         // Revert local state if input is invalid before calling setAt
         setEditableMemory((prev) => {
           const newState = [...prev];
-          newState[index] = currentValueInMemory.toString(); // Revert to original value
+          newState[index] = currentValueInMemory?.toString() ?? ""; // Revert to original value
           return newState;
         });
       }
@@ -106,7 +92,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
       // Revert changes on Escape by reading directly from memory
       setEditableMemory((prev) => {
         const newState = [...prev];
-        newState[index] = memory.getAt(index).toString();
+        newState[index] = memory.at(index)?.toString() ?? "";
         return newState;
       });
     }
@@ -118,7 +104,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
         <CardTitle>Memory Contents</CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[300px] w-full">
+        <div className="h-[300px] w-full overflow-y-scroll">
           {" "}
           {/* Adjust height as needed */}
           <Table>
@@ -130,7 +116,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {Array.from({ length: memorySize }).map((_, index) => (
+              {Array.from({ length: memory.length }).map((_, index) => (
                 <TableRow key={index}>
                   <TableCell className="font-mono">{index}</TableCell>
                   <TableCell>
@@ -148,7 +134,8 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
                       variant="outline"
                       onClick={() => handleSave(index)}
                       disabled={
-                        editableMemory[index] === memory.getAt(index).toString()
+                        editableMemory[index] ===
+                        (memory.at(index)?.toString() ?? "")
                       } // Disable if unchanged
                     >
                       Save
@@ -158,7 +145,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({ memory, rows }) => {
               ))}
             </TableBody>
           </Table>
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );

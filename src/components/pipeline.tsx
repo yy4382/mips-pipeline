@@ -44,6 +44,10 @@ export function PipelineComp() {
     pipelineRef.current.pipelineRegs
   );
   const [statistics, setStatistics] = useState(pipelineRef.current.statistics);
+  const [memory, setMemory] = useState(pipelineRef.current.mem.getMemory());
+  const [registerFile, setRegisterFile] = useState(
+    pipelineRef.current.registerFile.getRegisters()
+  );
 
   const hazardCallback = useCallback<HazardCallback>((type, cause) => {
     toast(
@@ -71,26 +75,25 @@ export function PipelineComp() {
     );
   }, []);
 
-  const tickCallback = useCallback(
-    (pipeline: Pipeline) => {
-      setPipelineRegs(pipeline.pipelineRegs);
-      setStatistics({ ...pipeline.statistics });
+  const tickCallback = useCallback((pipeline: Pipeline) => {
+    setPipelineRegs(pipeline.pipelineRegs);
+    setStatistics({ ...pipeline.statistics });
 
-      const newInstWithStage = parseInstWithStage(pipeline);
-      const currentCycle = pipeline.statistics.clockCycles;
+    const newInstWithStage = parseInstWithStage(pipeline);
+    const currentCycle = pipeline.statistics.clockCycles;
 
-      setInstCycleGraph((prev) => {
-        return [
-          ...prev,
-          {
-            cycle: currentCycle,
-            instructions: newInstWithStage,
-          },
-        ];
-      });
-    },
-    [setInstCycleGraph, setPipelineRegs, setStatistics]
-  );
+    setInstCycleGraph((prev) => {
+      return [
+        ...prev,
+        {
+          cycle: currentCycle,
+          instructions: newInstWithStage,
+        },
+      ];
+    });
+    setMemory(pipelineRef.current.mem.getMemory());
+    setRegisterFile(pipelineRef.current.registerFile.getRegisters());
+  }, []);
 
   const handleTick = (stopAt: number | undefined) => {
     pipelineRef.current.tick(
@@ -100,21 +103,24 @@ export function PipelineComp() {
       tickCallback
     );
   };
+  const handleSetMem = (i: number, value: number) => {
+    pipelineRef.current.mem.setAt(i, value);
+    setMemory(pipelineRef.current.mem.getMemory());
+  };
 
-  const resetCallback = useCallback(
-    (pipeline: Pipeline) => {
-      console.debug("Pipeline reset callback called");
-      setPipelineRegs(pipeline.pipelineRegs);
-      setStatistics({ ...pipeline.statistics });
-      setInstCycleGraph([
-        {
-          cycle: 0,
-          instructions: parseInstWithStage(pipeline),
-        },
-      ]);
-    },
-    [setInstCycleGraph, setPipelineRegs, setStatistics]
-  );
+  const resetCallback = useCallback((pipeline: Pipeline) => {
+    console.debug("Pipeline reset callback called");
+    setPipelineRegs(pipeline.pipelineRegs);
+    setStatistics({ ...pipeline.statistics });
+    setInstCycleGraph([
+      {
+        cycle: 0,
+        instructions: parseInstWithStage(pipeline),
+      },
+    ]);
+    setMemory(pipelineRef.current.mem.getMemory());
+    setRegisterFile(pipelineRef.current.registerFile.getRegisters());
+  }, []);
 
   const handleReset = () => {
     pipelineRef.current.reset(resetCallback);
@@ -157,10 +163,8 @@ export function PipelineComp() {
         <div className="lg:col-span-3 flex flex-col gap-6">
           <InstructionList instructions={instCycleGraph.at(-1)!.instructions} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <MemoryViewer memory={pipelineRef.current.mem} />
-            <RegisterFileViewer
-              registerFile={pipelineRef.current.registerFile}
-            />
+            <MemoryViewer memory={memory} setMemory={handleSetMem} />
+            <RegisterFileViewer registerFile={registerFile} />
           </div>
         </div>
       </div>
