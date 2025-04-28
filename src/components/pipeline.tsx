@@ -126,9 +126,12 @@ export function PipelineComp() {
     pipelineRef.current.reset(resetCallback);
   };
 
-  const handleSetIMem = (s: string) => {
-    pipelineRef.current.setIMem(InstructionMemory.parse(s), resetCallback);
-  };
+  const handleSetIMem = useCallback(
+    (s: string) => {
+      pipelineRef.current.setIMem(InstructionMemory.parse(s), resetCallback);
+    },
+    [resetCallback]
+  );
 
   const handleForwardingChange = (checked: boolean) => {
     setUseForwarding(checked);

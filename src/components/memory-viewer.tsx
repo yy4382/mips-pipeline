@@ -1,13 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -78,7 +70,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({
         });
       }
     },
-    [editableMemory, memory]
+    [editableMemory, memory, setMemory]
   ); // Keep editableMemory dependency for reading the input value
 
   const handleKeyDown = (
@@ -95,6 +87,8 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({
         newState[index] = memory.at(index)?.toString() ?? "";
         return newState;
       });
+      // Optionally blur the input to signify cancellation
+      (event.target as HTMLInputElement).blur();
     }
   };
 
@@ -104,47 +98,50 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({
         <CardTitle>Memory Contents</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] w-full overflow-y-scroll">
-          {" "}
-          {/* Adjust height as needed */}
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">Address</TableHead>
-                <TableHead>Value</TableHead>
-                <TableHead className="w-[80px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: memory.length }).map((_, index) => (
-                <TableRow key={index}>
-                  <TableCell className="font-mono">{index}</TableCell>
-                  <TableCell>
-                    <Input
-                      type="text" // Use text to allow intermediate invalid states
-                      value={editableMemory[index] ?? ""} // Use local state for input value
-                      onChange={(e) => handleInputChange(index, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e, index)} // Save on Enter, revert on Escape
-                      className="font-mono h-8" // Adjust size as needed
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleSave(index)}
-                      disabled={
-                        editableMemory[index] ===
-                        (memory.at(index)?.toString() ?? "")
-                      } // Disable if unchanged
-                    >
-                      Save
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        {/* Grid container with fixed header */}
+        <div className="h-[300px] w-full overflow-y-scroll border rounded-md">
+          {/* Grid Header */}
+          <div className="sticky top-0 grid grid-cols-[100px_1fr_80px] gap-x-4 bg-muted z-20 px-4 py-2 border-b font-medium">
+            <div className="w-[100px]">Address</div>
+            <div>Value</div>
+            <div className="w-[80px]">Actions</div>
+          </div>
+          {/* Grid Body */}
+          <div className="grid grid-cols-[100px_1fr_80px] gap-x-4 items-center">
+            {Array.from({ length: memory.length }).map((_, index) => (
+              <React.Fragment key={index}>
+                {/* Address Cell */}
+                <div className="font-mono px-4 py-1 text-sm">{index}</div>
+                {/* Value Cell */}
+                <div className="px-4 py-1">
+                  <Input
+                    type="text" // Use text to allow intermediate invalid states
+                    value={editableMemory[index] ?? ""} // Use local state for input value
+                    onChange={(e) => handleInputChange(index, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, index)} // Save on Enter, revert on Escape
+                    onBlur={() => handleSave(index)} // Optionally save on blur if value is valid
+                    className="font-mono h-8 text-sm" // Adjust size as needed
+                  />
+                </div>
+                {/* Actions Cell */}
+                <div className="px-4 py-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleSave(index)}
+                    disabled={
+                      editableMemory[index] ===
+                        (memory.at(index)?.toString() ?? "") ||
+                      isNaN(parseInt(editableMemory[index], 10)) // Also disable if current input is not a valid number
+                    } // Disable if unchanged or invalid
+                    className="h-8 text-xs"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>

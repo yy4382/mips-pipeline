@@ -20,7 +20,6 @@ export class Memory {
     }
     // Ensure value is treated as a number, handling potential string input from forms
     const numericValue = Number(value);
-    let changed = false;
     if (isNaN(numericValue)) {
       console.warn(
         `Attempted to set non-numeric value at index ${index}: ${value}`
@@ -29,11 +28,9 @@ export class Memory {
       // throw new Error(`Invalid value type for memory at index ${index}: ${value}`);
       if (this.memory[index] !== 0) {
         this.memory[index] = 0; // Defaulting to 0 if input is not a valid number
-        changed = true;
       }
     } else if (this.memory[index] !== numericValue) {
       this.memory[index] = numericValue;
-      changed = true;
     }
   }
 
