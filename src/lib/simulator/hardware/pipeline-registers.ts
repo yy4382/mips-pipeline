@@ -24,6 +24,21 @@ export type PipelineRegs = {
   };
 };
 
+export type ControlSignals = {
+  // EX Control
+  branchController: (reg1: number, reg2: number) => boolean;
+  aSel: "reg1" | "pc";
+  bSel: "reg2" | "immediate";
+  aluOp: "add";
+
+  // MEM Control
+  memWriteEnable: boolean;
+
+  // WB Control
+  wbSel: "alu" | "mem";
+  regWriteEnable: boolean;
+};
+
 export function getDefaultPipelineRegs(): PipelineRegs {
   return {
     mem2wb: { inst: Instruction.default(), mem: 0, alu: 0 },

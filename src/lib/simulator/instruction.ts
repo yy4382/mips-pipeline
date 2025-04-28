@@ -1,3 +1,5 @@
+import { ControlSignals } from "./hardware/pipeline-registers";
+
 export class Instruction {
   /**
    * The raw instruction string.
@@ -23,11 +25,11 @@ export class Instruction {
     throw new Error("writingRegister unimplemented");
   }
 
-  get writingAvailableStage(): "EX" | "MEM" | undefined {
-    throw new Error("writingAvailableStage unimplemented");
+  get controlSignals(): ControlSignals {
+    throw new Error("controlSignals unimplemented");
   }
 
-  static default(): RInstruction {
+  static default(): AddInstruction {
     return new AddInstruction(0, 0, 0, "add $0, $0, $0 #NOP");
   }
 
@@ -188,9 +190,6 @@ export class AddInstruction extends RInstruction {
   get writingRegister(): number {
     return this.rd;
   }
-  get writingAvailableStage(): "EX" | "MEM" | undefined {
-    return "EX";
-  }
   static fromRInstruction(inst: RInstruction): AddInstruction {
     return new AddInstruction(
       inst.rs1,
@@ -200,9 +199,20 @@ export class AddInstruction extends RInstruction {
       inst.originalIndex
     );
   }
+  get controlSignals(): ControlSignals {
+    return {
+      branchController: () => false,
+      aSel: "reg1",
+      bSel: "reg2",
+      aluOp: "add",
+      memWriteEnable: false,
+      wbSel: "alu",
+      regWriteEnable: true,
+    };
+  }
 }
 
-class IInstruction extends Instruction {
+export class IInstruction extends Instruction {
   public rs1: number;
   public rd: number;
   public immediate: number;
@@ -236,9 +246,6 @@ export class LwInstruction extends IInstruction {
   get writingRegister(): number {
     return this.rd;
   }
-  get writingAvailableStage(): "EX" | "MEM" | undefined {
-    return "MEM";
-  }
   static fromIInstruction(inst: IInstruction): LwInstruction {
     return new LwInstruction(
       inst.rs1,
@@ -248,6 +255,17 @@ export class LwInstruction extends IInstruction {
       inst.originalIndex
     );
   }
+  get controlSignals(): ControlSignals {
+    return {
+      branchController: () => false,
+      aSel: "reg1",
+      bSel: "immediate",
+      aluOp: "add",
+      memWriteEnable: false,
+      wbSel: "mem",
+      regWriteEnable: true,
+    };
+  }
 }
 
 export class SwInstruction extends IInstruction {
@@ -255,9 +273,6 @@ export class SwInstruction extends IInstruction {
     return [this.rs1, this.rd];
   }
   get writingRegister(): number | undefined {
-    return undefined;
-  }
-  get writingAvailableStage(): "EX" | "MEM" | undefined {
     return undefined;
   }
   static fromIInstruction(inst: IInstruction): SwInstruction {
@@ -269,6 +284,17 @@ export class SwInstruction extends IInstruction {
       inst.originalIndex
     );
   }
+  get controlSignals(): ControlSignals {
+    return {
+      branchController: () => false,
+      aSel: "reg1",
+      bSel: "immediate",
+      aluOp: "add",
+      memWriteEnable: true,
+      wbSel: "alu", // doesn't matter
+      regWriteEnable: false,
+    };
+  }
 }
 
 export class BeqInstruction extends IInstruction {
@@ -276,9 +302,6 @@ export class BeqInstruction extends IInstruction {
     return [this.rs1, this.rd];
   }
   get writingRegister(): number | undefined {
-    return undefined;
-  }
-  get writingAvailableStage(): "EX" | "MEM" | undefined {
     return undefined;
   }
   static fromIInstruction(inst: IInstruction): BeqInstruction {
@@ -290,6 +313,17 @@ export class BeqInstruction extends IInstruction {
       inst.originalIndex
     );
   }
+  get controlSignals(): ControlSignals {
+    return {
+      branchController: (reg1: number, reg2: number) => reg1 === reg2,
+      aSel: "pc",
+      bSel: "immediate",
+      aluOp: "add",
+      memWriteEnable: false,
+      wbSel: "alu", // doesn't matter
+      regWriteEnable: false,
+    };
+  }
 }
 
 export class AddiInstruction extends IInstruction {
@@ -299,9 +333,6 @@ export class AddiInstruction extends IInstruction {
   get writingRegister(): number {
     return this.rd;
   }
-  get writingAvailableStage(): "EX" | "MEM" | undefined {
-    return "EX";
-  }
   static fromIInstruction(inst: IInstruction): AddiInstruction {
     return new AddiInstruction(
       inst.rs1,
@@ -310,6 +341,17 @@ export class AddiInstruction extends IInstruction {
       inst.raw,
       inst.originalIndex
     );
+  }
+  get controlSignals(): ControlSignals {
+    return {
+      branchController: () => false,
+      aSel: "reg1",
+      bSel: "immediate",
+      aluOp: "add",
+      memWriteEnable: false,
+      wbSel: "alu",
+      regWriteEnable: true,
+    };
   }
 }
 

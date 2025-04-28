@@ -1,12 +1,4 @@
-import {
-  Instruction,
-  InstructionMemory,
-  LwInstruction,
-  AddiInstruction,
-  AddInstruction,
-  SwInstruction,
-  BeqInstruction,
-} from "./instruction";
+import { Instruction, InstructionMemory, IInstruction } from "./instruction";
 import { Memory } from "./hardware/memory";
 import { RegisterFile } from "./hardware/register-file";
 import {
@@ -110,6 +102,7 @@ export class Pipeline {
     forwardCb: (arg: ForwardDetail) => void = () => {}
   ) {
     const newPipelineRegs = getDefaultPipelineRegs();
+    let newPc = this.pc + 1;
 
     this.writeBackStage(this.pipelineRegs.mem2wb);
     newPipelineRegs.mem2wb = this.memStage(this.pipelineRegs.ex2mem);
@@ -131,7 +124,7 @@ export class Pipeline {
       // flush the pipeline (making the just-run instructions in IF and ID into NOP)
       newPipelineRegs.id2ex = getDefaultPipelineRegs().id2ex;
       newPipelineRegs.if2id = getDefaultPipelineRegs().if2id;
-      this.pc = newPipelineRegs.ex2mem.alu_out;
+      newPc = newPipelineRegs.ex2mem.alu_out;
     } else {
       let hazard;
       if (this.forwarding) {
@@ -154,8 +147,7 @@ export class Pipeline {
         newPipelineRegs.id2ex = getDefaultPipelineRegs().id2ex;
         // keeps the IF to ID stage registers and PC unchanged
         newPipelineRegs.if2id = this.pipelineRegs.if2id;
-      } else {
-        this.pc++;
+        newPc = this.pc;
       }
     }
 
@@ -166,6 +158,7 @@ export class Pipeline {
     }
 
     this.pipelineRegs = newPipelineRegs;
+    this.pc = newPc;
   }
 
   reset(resetCallback: (pipeline: Pipeline) => void) {
@@ -208,12 +201,12 @@ export class Pipeline {
     console.debug(
       `writeBackStage: ${inst.raw} mem_input: ${mem_input} alu_input: ${alu_input}`
     );
-    if (inst instanceof LwInstruction) {
-      this.registerFile.setAt(inst.rd, mem_input);
-    } else if (inst instanceof AddiInstruction) {
-      this.registerFile.setAt(inst.rd, alu_input);
-    } else if (inst instanceof AddInstruction) {
-      this.registerFile.setAt(inst.rd, alu_input);
+    if (inst.controlSignals.regWriteEnable) {
+      if (inst.controlSignals.wbSel === "alu") {
+        this.registerFile.setAt(inst.writingRegister!, alu_input);
+      } else if (inst.controlSignals.wbSel === "mem") {
+        this.registerFile.setAt(inst.writingRegister!, mem_input);
+      }
     }
   }
 
@@ -225,12 +218,12 @@ export class Pipeline {
     console.debug(
       `memStage: ${inst.raw} mem_addr: ${alu} write_data: ${write_data}`
     );
-    if (inst instanceof LwInstruction) {
-      return { inst, mem: this.mem.getAt(alu), alu: alu };
-    } else if (inst instanceof SwInstruction) {
+    const readMem =
+      inst.controlSignals.wbSel === "mem" ? this.mem.getAt(alu) : 0;
+    if (inst.controlSignals.memWriteEnable) {
       this.mem.setAt(alu, write_data);
     }
-    return { inst, mem: 0, alu };
+    return { inst, mem: readMem, alu };
   }
   aluStage({ inst, reg1, reg2, pc, immediate }: PipelineRegs["id2ex"]): {
     out: PipelineRegs["ex2mem"];
@@ -245,26 +238,24 @@ export class Pipeline {
         alu_out,
         write_data: reg2,
       });
-      if (inst instanceof AddInstruction) {
-        return getReturn(reg1 + reg2);
-      } else if (
-        inst instanceof LwInstruction ||
-        inst instanceof SwInstruction ||
-        inst instanceof AddiInstruction
-      ) {
-        return getReturn(reg1 + immediate);
-      } else if (inst instanceof BeqInstruction) {
-        return getReturn(pc + immediate);
+
+      const num1 = inst.controlSignals.aSel === "reg1" ? reg1 : pc;
+      const num2 = inst.controlSignals.bSel === "reg2" ? reg2 : immediate;
+
+      let result;
+
+      if (inst.controlSignals.aluOp === "add") {
+        result = num1 + num2;
+      } else {
+        throw new Error("Unknown ALU operation");
       }
-      throw new Error("Unknown instruction type");
+      return getReturn(result);
     }
-    function calculateShouldBranch(): boolean {
-      if (inst instanceof BeqInstruction) {
-        return reg1 === reg2;
-      }
-      return false;
-    }
-    return { out: calculateOut(), shouldBranch: calculateShouldBranch() };
+
+    return {
+      out: calculateOut(),
+      shouldBranch: inst.controlSignals.branchController(reg1, reg2),
+    };
   }
   instDecodeStage({ inst, pc }: PipelineRegs["if2id"]): PipelineRegs["id2ex"] {
     console.debug(`instDecodeStage: ${inst.raw} pc: ${pc}`);
@@ -275,30 +266,11 @@ export class Pipeline {
       reg2,
       immediate,
     });
-    if (inst instanceof LwInstruction) {
-      return getReturn(this.registerFile.getAt(inst.rs1), 0, inst.immediate);
-    } else if (inst instanceof SwInstruction) {
-      return getReturn(
-        this.registerFile.getAt(inst.rs1),
-        this.registerFile.getAt(inst.rd),
-        inst.immediate
-      );
-    } else if (inst instanceof AddInstruction) {
-      return getReturn(
-        this.registerFile.getAt(inst.rs1),
-        this.registerFile.getAt(inst.rs2),
-        0
-      );
-    } else if (inst instanceof AddiInstruction) {
-      return getReturn(this.registerFile.getAt(inst.rs1), 0, inst.immediate);
-    } else if (inst instanceof BeqInstruction) {
-      return getReturn(
-        this.registerFile.getAt(inst.rs1),
-        this.registerFile.getAt(inst.rd),
-        inst.immediate
-      );
-    }
-    throw new Error("Unknown instruction type");
+
+    const reg1 = this.registerFile.getAt(inst.readingRegisters[0] ?? 0);
+    const reg2 = this.registerFile.getAt(inst.readingRegisters[1] ?? 0);
+    const immediate = inst instanceof IInstruction ? inst.immediate : 0;
+    return getReturn(reg1, reg2, immediate);
   }
   instFetchStage(instIndex: number): PipelineRegs["if2id"] {
     console.debug(
@@ -358,7 +330,7 @@ function checkForwardingForRegister(
     regIndexCollision(targetRegIndex, pipelineRegs.ex2mem.inst.writingRegister)
   ) {
     // Load-use hazard: LW instruction in EX/MEM, data not ready yet.
-    if (pipelineRegs.ex2mem.inst.writingAvailableStage === "MEM") {
+    if (pipelineRegs.ex2mem.inst.controlSignals.wbSel === "mem") {
       return { needsStall: true };
     }
     // Forward ALU result from EX/MEM stage
@@ -387,7 +359,7 @@ function checkForwardingForRegister(
           regIndex: pipelineRegs.mem2wb.inst.writingRegister!,
         },
         data:
-          pipelineRegs.mem2wb.inst instanceof LwInstruction
+          pipelineRegs.mem2wb.inst.controlSignals.wbSel === "mem"
             ? pipelineRegs.mem2wb.mem
             : pipelineRegs.mem2wb.alu,
       },
