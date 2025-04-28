@@ -1,9 +1,11 @@
 import {
-  ArithmeticInstruction,
-  BranchInstruction,
   Instruction,
   InstructionMemory,
-  LoadSaveInstruction,
+  LwInstruction,
+  AddiInstruction,
+  AddInstruction,
+  SwInstruction,
+  BeqInstruction,
 } from "./instruction";
 import { Memory } from "./hardware/memory";
 import { RegisterFile } from "./hardware/register-file";
@@ -206,31 +208,29 @@ export class Pipeline {
     console.debug(
       `writeBackStage: ${inst.raw} mem_input: ${mem_input} alu_input: ${alu_input}`
     );
-    if (inst instanceof LoadSaveInstruction) {
-      if (inst.type === "load") {
-        this.registerFile.setAt(inst.registerIndex, mem_input);
-      }
-    } else if (inst instanceof ArithmeticInstruction) {
-      this.registerFile.setAt(inst.resultRegisterIndex, alu_input);
+    if (inst instanceof LwInstruction) {
+      this.registerFile.setAt(inst.rd, mem_input);
+    } else if (inst instanceof AddiInstruction) {
+      this.registerFile.setAt(inst.rd, alu_input);
+    } else if (inst instanceof AddInstruction) {
+      this.registerFile.setAt(inst.rd, alu_input);
     }
   }
 
   memStage({
     inst,
-    alu_out: mem_addr,
+    alu_out: alu,
     write_data,
   }: PipelineRegs["ex2mem"]): PipelineRegs["mem2wb"] {
     console.debug(
-      `memStage: ${inst.raw} mem_addr: ${mem_addr} write_data: ${write_data}`
+      `memStage: ${inst.raw} mem_addr: ${alu} write_data: ${write_data}`
     );
-    if (inst instanceof LoadSaveInstruction) {
-      if (inst.type === "load") {
-        return { inst, mem: this.mem.getAt(mem_addr), alu: mem_addr };
-      } else if (inst.type === "store") {
-        this.mem.setAt(mem_addr, write_data);
-      }
+    if (inst instanceof LwInstruction) {
+      return { inst, mem: this.mem.getAt(alu), alu: alu };
+    } else if (inst instanceof SwInstruction) {
+      this.mem.setAt(alu, write_data);
     }
-    return { inst, mem: NaN, alu: mem_addr };
+    return { inst, mem: 0, alu };
   }
   aluStage({ inst, reg1, reg2, pc, immediate }: PipelineRegs["id2ex"]): {
     out: PipelineRegs["ex2mem"];
@@ -239,38 +239,66 @@ export class Pipeline {
     console.debug(
       `aluStage: ${inst.raw} reg1: ${reg1} reg2: ${reg2} pc: ${pc} immediate: ${immediate}`
     );
-    function calcuateOut() {
-      if (inst instanceof ArithmeticInstruction) {
-        return { inst, alu_out: reg1 + reg2, write_data: reg2 };
-      }
-      if (inst instanceof LoadSaveInstruction) {
-        return { inst, alu_out: reg1 + immediate, write_data: reg2 };
-      }
-      if (inst instanceof BranchInstruction) {
-        return { inst, write_data: reg2, alu_out: pc + immediate };
+    function calculateOut() {
+      const getReturn = (alu_out: number) => ({
+        inst,
+        alu_out,
+        write_data: reg2,
+      });
+      if (inst instanceof AddInstruction) {
+        return getReturn(reg1 + reg2);
+      } else if (
+        inst instanceof LwInstruction ||
+        inst instanceof SwInstruction ||
+        inst instanceof AddiInstruction
+      ) {
+        return getReturn(reg1 + immediate);
+      } else if (inst instanceof BeqInstruction) {
+        return getReturn(pc + immediate);
       }
       throw new Error("Unknown instruction type");
     }
     function calculateShouldBranch(): boolean {
-      if (inst instanceof BranchInstruction) {
-        if (inst.type === "beqz") {
-          return reg1 === 0;
-        }
-        throw new Error("Unknown branch type");
+      if (inst instanceof BeqInstruction) {
+        return reg1 === reg2;
       }
       return false;
     }
-    return { out: calcuateOut(), shouldBranch: calculateShouldBranch() };
+    return { out: calculateOut(), shouldBranch: calculateShouldBranch() };
   }
   instDecodeStage({ inst, pc }: PipelineRegs["if2id"]): PipelineRegs["id2ex"] {
     console.debug(`instDecodeStage: ${inst.raw} pc: ${pc}`);
-    return {
+    const getReturn = (reg1: number, reg2: number, immediate: number) => ({
       inst,
       pc,
-      reg1: this.registerFile.getAt(inst.rs1 ?? 0),
-      reg2: this.registerFile.getAt(inst.rs2 ?? 0),
-      immediate: inst.immediate ?? 0,
-    };
+      reg1,
+      reg2,
+      immediate,
+    });
+    if (inst instanceof LwInstruction) {
+      return getReturn(this.registerFile.getAt(inst.rs1), 0, inst.immediate);
+    } else if (inst instanceof SwInstruction) {
+      return getReturn(
+        this.registerFile.getAt(inst.rs1),
+        this.registerFile.getAt(inst.rd),
+        inst.immediate
+      );
+    } else if (inst instanceof AddInstruction) {
+      return getReturn(
+        this.registerFile.getAt(inst.rs1),
+        this.registerFile.getAt(inst.rs2),
+        0
+      );
+    } else if (inst instanceof AddiInstruction) {
+      return getReturn(this.registerFile.getAt(inst.rs1), 0, inst.immediate);
+    } else if (inst instanceof BeqInstruction) {
+      return getReturn(
+        this.registerFile.getAt(inst.rs1),
+        this.registerFile.getAt(inst.rd),
+        inst.immediate
+      );
+    }
+    throw new Error("Unknown instruction type");
   }
   instFetchStage(instIndex: number): PipelineRegs["if2id"] {
     console.debug(
@@ -299,38 +327,38 @@ function regIndexCollision(
 }
 
 function calculateHazards(pipelineRegs: PipelineRegs): boolean {
-  const rs1 = pipelineRegs.id2ex.inst.rs1;
-  const rs2 = pipelineRegs.id2ex.inst.rs2;
-  const memWriteReg = pipelineRegs.ex2mem.inst.rd;
-  const wbWriteReg = pipelineRegs.mem2wb.inst.rd;
+  const readingRegs = pipelineRegs.id2ex.inst.readingRegisters;
+  const memWriteReg = pipelineRegs.ex2mem.inst.writingRegister;
+  const wbWriteReg = pipelineRegs.mem2wb.inst.writingRegister;
 
-  if (
-    regIndexCollision(rs1, wbWriteReg) ||
-    regIndexCollision(rs2, wbWriteReg) ||
-    regIndexCollision(rs1, memWriteReg) ||
-    regIndexCollision(rs2, memWriteReg)
-  ) {
-    return true;
-  } else {
-    return false;
+  for (const regIndex of readingRegs) {
+    if (
+      regIndexCollision(regIndex, memWriteReg) ||
+      regIndexCollision(regIndex, wbWriteReg)
+    ) {
+      return true; // Data hazard detected
+    }
   }
+  return false; // No data hazard detected
 }
 
 /**
  * Checks for data hazards for a specific source register and determines
  * if forwarding is possible or if a stall is needed.
- * @param sourceRegIndex The index of the source register (rs1 or rs2) in the ID stage.
+ * @param targetRegIndex The index of the source register (rs1 or rs2) in the ID stage.
  * @param pipelineRegs The current pipeline registers.
  * @returns An object indicating if a stall is needed and the value to forward, if any.
  */
 function checkForwardingForRegister(
-  sourceRegIndex: number | undefined,
+  targetRegIndex: number | undefined,
   pipelineRegs: PipelineRegs
 ): { needsStall: boolean; forwardDetail?: Omit<ForwardDetail, "target"> } {
   // Check EX/MEM stage for collision
-  if (regIndexCollision(sourceRegIndex, pipelineRegs.ex2mem.inst.rd)) {
+  if (
+    regIndexCollision(targetRegIndex, pipelineRegs.ex2mem.inst.writingRegister)
+  ) {
     // Load-use hazard: LW instruction in EX/MEM, data not ready yet.
-    if (pipelineRegs.ex2mem.inst instanceof LoadSaveInstruction) {
+    if (pipelineRegs.ex2mem.inst.writingAvailableStage === "MEM") {
       return { needsStall: true };
     }
     // Forward ALU result from EX/MEM stage
@@ -339,7 +367,7 @@ function checkForwardingForRegister(
       forwardDetail: {
         source: {
           inst: pipelineRegs.ex2mem.inst,
-          regIndex: pipelineRegs.ex2mem.inst.rd!,
+          regIndex: pipelineRegs.ex2mem.inst.writingRegister!,
         },
         data: pipelineRegs.ex2mem.alu_out,
       },
@@ -347,38 +375,23 @@ function checkForwardingForRegister(
   }
 
   // Check MEM/WB stage for collision
-  if (regIndexCollision(sourceRegIndex, pipelineRegs.mem2wb.inst.rd)) {
-    // Forward data loaded from memory in MEM/WB stage
-    if (pipelineRegs.mem2wb.inst instanceof LoadSaveInstruction) {
-      return {
-        needsStall: false,
-        forwardDetail: {
-          source: {
-            inst: pipelineRegs.mem2wb.inst,
-            regIndex: pipelineRegs.mem2wb.inst.rd!,
-          },
-          data: pipelineRegs.mem2wb.mem,
+  if (
+    regIndexCollision(targetRegIndex, pipelineRegs.mem2wb.inst.writingRegister)
+  ) {
+    // Forward data in MEM/WB stage
+    return {
+      needsStall: false,
+      forwardDetail: {
+        source: {
+          inst: pipelineRegs.mem2wb.inst,
+          regIndex: pipelineRegs.mem2wb.inst.writingRegister!,
         },
-      };
-    }
-    // Forward ALU result from MEM/WB stage
-    if (pipelineRegs.mem2wb.inst instanceof ArithmeticInstruction) {
-      return {
-        needsStall: false,
-        forwardDetail: {
-          source: {
-            inst: pipelineRegs.mem2wb.inst,
-            regIndex: pipelineRegs.mem2wb.inst.rd!,
-          },
-          data: pipelineRegs.mem2wb.alu,
-        },
-      };
-    }
-    // Should ideally not happen with supported instruction types writing to rd
-    console.warn(
-      "Unhandled instruction type in MEM/WB for forwarding:",
-      pipelineRegs.mem2wb.inst.raw
-    );
+        data:
+          pipelineRegs.mem2wb.inst instanceof LwInstruction
+            ? pipelineRegs.mem2wb.mem
+            : pipelineRegs.mem2wb.alu,
+      },
+    };
   }
 
   // No hazard detected for this register
@@ -397,45 +410,36 @@ function tryForward(
   forwardCb: (arg: ForwardDetail) => void,
   addForwardCount: () => void
 ): boolean {
-  const resultRs1 = checkForwardingForRegister(
-    pipelineRegs.id2ex.inst.rs1,
-    pipelineRegs
-  );
-  const resultRs2 = checkForwardingForRegister(
-    pipelineRegs.id2ex.inst.rs2,
-    pipelineRegs
-  );
+  const results = pipelineRegs.id2ex.inst.readingRegisters.map((regIndex) => {
+    return [
+      checkForwardingForRegister(regIndex, pipelineRegs),
+      regIndex,
+    ] as const;
+  });
 
-  if (resultRs1.needsStall || resultRs2.needsStall) {
+  if (results.some((result) => result[0].needsStall)) {
     return true; // Stall needed
   }
 
-  // Apply forwarding if a value was returned
-  if (resultRs1.forwardDetail !== undefined) {
-    pipelineRegs.id2ex.reg1 = resultRs1.forwardDetail.data;
-    const detail: ForwardDetail = {
-      ...resultRs1.forwardDetail,
-      target: {
-        inst: pipelineRegs.id2ex.inst,
-        regIndex: pipelineRegs.id2ex.inst.rs1!,
-      },
-    };
-    forwardCb(detail);
-    addForwardCount();
-    console.debug(detail);
-  }
-  if (resultRs2.forwardDetail !== undefined) {
-    pipelineRegs.id2ex.reg2 = resultRs2.forwardDetail.data;
-    const detail: ForwardDetail = {
-      ...resultRs2.forwardDetail,
-      target: {
-        inst: pipelineRegs.id2ex.inst,
-        regIndex: pipelineRegs.id2ex.inst.rs2!,
-      },
-    };
-    forwardCb(detail);
-    addForwardCount();
-    console.debug(detail);
-  }
+  results.forEach((result, i) => {
+    if (result[0].forwardDetail !== undefined && result[1] !== undefined) {
+      if (i === 0) {
+        pipelineRegs.id2ex.reg1 = result[0].forwardDetail.data;
+      } else {
+        pipelineRegs.id2ex.reg2 = result[0].forwardDetail.data;
+      }
+      const detail: ForwardDetail = {
+        ...result[0].forwardDetail,
+        target: {
+          inst: pipelineRegs.id2ex.inst,
+          regIndex: result[1],
+        },
+      };
+      forwardCb(detail);
+      addForwardCount();
+      console.debug(detail);
+    }
+  });
+
   return false; // No stall needed
 }

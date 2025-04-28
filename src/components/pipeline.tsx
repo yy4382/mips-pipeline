@@ -20,16 +20,14 @@ import { PipelineControls } from "./pipeline-controls";
 import { InstructionCycleGraph } from "./instruction-cycle-graph"; // Import the new component
 
 const DEFAULT_INSTRUCTION = `
-load $1, 0($0)
-load $2, 1($0)
-add $0, $0, $0
+lw $1, 0($0)
+lw $2, 1($0)
 add $0, $0, $0
 add $0, $0, $0
 add $3, $1, $2
 add $0, $0, $0
 add $0, $0, $0
-add $0, $0, $0
-store $3, 2($0)
+sw $3, 2($0)
 `;
 
 export function PipelineComp() {

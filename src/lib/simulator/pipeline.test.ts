@@ -4,16 +4,14 @@ import { InstructionMemory } from "./instruction";
 
 test("pipeline - basic", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
-    add $0, $0, $0
+    lw $1, 0($0)
+    lw $2, 1($0)
     add $0, $0, $0
     add $0, $0, $0
     add $3, $1, $2
     add $0, $0, $0
     add $0, $0, $0
-    add $0, $0, $0
-    store $3, 2($0)
+    sw $3, 2($0)
     `)
   const pipeline = new Pipeline(iMem);
   pipeline.mem.setAt(0, 1);
@@ -29,9 +27,8 @@ test("pipeline - basic", () => {
 
 test("pipeline - basic branch - not branch", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
-    add $0, $0, $0
+    lw $1, 0($0)
+    lw $2, 1($0)
     add $0, $0, $0
     add $0, $0, $0
     beqz $1, 2
@@ -53,8 +50,8 @@ test("pipeline - basic branch - not branch", () => {
 })
 test("pipeline - basic branch - should branch", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
+    lw $1, 0($0)
+    lw $2, 1($0)
     add $0, $0, $0
     add $0, $0, $0
     add $0, $0, $0
@@ -78,10 +75,10 @@ test("pipeline - basic branch - should branch", () => {
 
 test("pipeline - RAW", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
+    lw $1, 0($0)
+    lw $2, 1($0)
     add $3, $1, $2
-    store $3, 2($0)
+    sw $3, 2($0)
     `)
   const pipeline = new Pipeline(iMem);
   pipeline.mem.setAt(0, 1);
@@ -97,9 +94,9 @@ test("pipeline - RAW", () => {
 
 test("pipeline - will branch and branch inst as RAW", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
-    load $3, 2($0)
+    lw $1, 0($0)
+    lw $2, 1($0)
+    lw $3, 2($0)
     beqz $3, 3
     add $4, $1, $2
     add $5, $1, $2
@@ -120,9 +117,9 @@ test("pipeline - will branch and branch inst as RAW", () => {
 
 test("pipeline - will branch and flushed inst has RAW", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
+    lw $1, 0($0)
     beqz $0, 3
-    load $2, 1($0)
+    lw $2, 1($0)
     add $3, $1, $2
     add $4, $1, $2
     `)
@@ -140,9 +137,9 @@ test("pipeline - will branch and flushed inst has RAW", () => {
 
 test("pipeline - RAW and not branch", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
-    load $3, 2($0)
+    lw $1, 0($0)
+    lw $2, 1($0)
+    lw $3, 2($0)
     beqz $2, 3
     add $4, $1, $2
     add $5, $1, $2
@@ -163,10 +160,10 @@ test("pipeline - RAW and not branch", () => {
 
 test("pipeline - RAW(forward)", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
+    lw $1, 0($0)
+    lw $2, 1($0)
     add $3, $1, $2
-    store $3, 2($0)
+    sw $3, 2($0)
     `)
   const pipeline = new Pipeline(iMem, true);
   pipeline.mem.setAt(0, 1);
@@ -181,8 +178,8 @@ test("pipeline - RAW(forward)", () => {
 })
 test("pipeline - RAW(forward)2", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
+    lw $1, 0($0)
+    lw $2, 1($0)
     add $3, $1, $2
     add $4, $3, $3
     `)
@@ -198,8 +195,8 @@ test("pipeline - RAW(forward)2", () => {
 })
 test("pipeline - RAW(forward)3", () => {
   const iMem = InstructionMemory.parse(`
-    load $1, 0($0)
-    load $2, 1($0)
+    lw $1, 0($0)
+    lw $2, 1($0)
     add $3, $1, $2
     add $4, $1, $3
     add $1, $1, $2

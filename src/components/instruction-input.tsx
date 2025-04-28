@@ -6,24 +6,24 @@ import { Button } from "./ui/button";
 const exampleInstructions = [
   {
     name: "Basic Load/Add/Store",
-    insts: `load $1, 0($0)
-load $2, 1($0)
+    insts: `lw $1, 0($0)
+lw $2, 1($0)
 add $3, $1, $2
-store $3, 2($0)`,
+sw $3, 2($0)`,
   },
   {
     name: "Branch Taken",
-    insts: `load $1, 0($0)
-load $2, 1($0)
+    insts: `lw $1, 0($0)
+lw $2, 1($0)
 beqz $0, 2 # Branch will be taken
 add $3, $2, $2 # This should be skipped
 add $4, $1, $1 # Execution continues here`,
   },
   {
     name: "Branch + Flushed RAW",
-    insts: `load $1, 0($0)
+    insts: `lw $1, 0($0)
 beqz $0, 3 # Branch taken
-load $2, 1($0) # Flushed
+lw $2, 1($0) # Flushed
 add $3, $1, $2 # Flushed (RAW on $2)
 add $4, $1, $1 # Execution continues here`,
   },
