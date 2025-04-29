@@ -29,7 +29,7 @@ export type ControlSignals = {
   branchController: (reg1: number, reg2: number) => boolean;
   aSel: "reg1" | "pc";
   bSel: "reg2" | "immediate";
-  aluOp: "add" | "sub";
+  aluOp: "add" | "sub" | "sll" | "srl" | "sra" | "and" | "or" | "xor";
 
   // MEM Control
   memWriteEnable: boolean;
@@ -38,6 +38,27 @@ export type ControlSignals = {
   wbSel: "alu" | "mem";
   regWriteEnable: boolean;
 };
+
+function getAluHandler(): Map<
+  ControlSignals["aluOp"],
+  (a: number, b: number) => number
+> {
+  const map = new Map<
+    ControlSignals["aluOp"],
+    (a: number, b: number) => number
+  >();
+  map.set("add", (a, b) => a + b);
+  map.set("sub", (a, b) => a - b);
+  map.set("sll", (a, b) => a << b);
+  map.set("srl", (a, b) => a >>> b);
+  map.set("sra", (a, b) => a >> b);
+  map.set("and", (a, b) => a & b);
+  map.set("or", (a, b) => a | b);
+  map.set("xor", (a, b) => a ^ b);
+  return map;
+}
+
+export const aluHandler = getAluHandler();
 
 export function getDefaultPipelineRegs(): PipelineRegs {
   return {

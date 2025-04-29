@@ -57,18 +57,37 @@ export function parseInsts(raw: string[]): InstructionType[] {
 
 export const _SUPPORTED_INSTRUCTIONS = [
   "add",
+  "addi",
   "sub",
+  "and",
+  "andi",
+  "or",
+  "ori",
+  "xor",
+  "xori",
+  "sll",
+  "slli",
+  "srl",
+  "srli",
+  "sra",
+  "srai",
+
   "lw",
   "sw",
-  "beqz",
-  "bnez",
+
   "beq",
   "bne",
   "bgt",
   "bge",
   "blt",
   "ble",
-  "addi",
+
+  "beqz",
+  "bnez",
+  "li",
+  "nop",
+  // "mv",
+  // "j",
 ] as const;
 type SupportedInstruction = (typeof _SUPPORTED_INSTRUCTIONS)[number];
 
@@ -77,7 +96,12 @@ function getParsers() {
     SupportedInstruction,
     (raw: string, remaining: string) => InstructionTypeFirstPassWithoutIndex
   > = new Map();
-  parsers.set("add", (raw, remaining) => {
+
+  function getArithmeticRInst(
+    raw: string,
+    remaining: string,
+    op: ControlSignals["aluOp"]
+  ): InstructionTypeFirstPassWithoutIndex {
     const [rs1, rs2, rd] = parseRType(remaining);
     return {
       raw,
@@ -88,50 +112,67 @@ function getParsers() {
         branchController: () => false,
         aSel: "reg1",
         bSel: "reg2",
-        aluOp: "add",
+        aluOp: op,
         memWriteEnable: false,
         wbSel: "alu",
         regWriteEnable: true,
       },
     };
-  });
+  }
 
-  parsers.set("sub", (raw, remaining) => {
-    const [rs1, rs2, rd] = parseRType(remaining);
+  function getArithmeticIInst(
+    raw: string,
+    remaining: string,
+    op: ControlSignals["aluOp"]
+  ): InstructionTypeFirstPassWithoutIndex {
+    const [rs1, rd, imm] = parseIType(remaining);
     return {
       raw,
-      readingRegisters: [rs1, rs2],
+      readingRegisters: [rs1, undefined],
       writingRegister: rd,
-      immediate: undefined,
-      controlSignals: {
-        branchController: () => false,
-        aSel: "reg1",
-        bSel: "reg2",
-        aluOp: "sub",
-        memWriteEnable: false,
-        wbSel: "alu",
-        regWriteEnable: true,
-      } satisfies ControlSignals as ControlSignals,
-    };
-  });
-
-  parsers.set("addi", (raw, remaining) => {
-    const [rs, rd, immediate] = parseIType(remaining);
-    return {
-      raw,
-      readingRegisters: [rs, undefined],
-      writingRegister: rd,
-      immediate,
+      immediate: imm,
       controlSignals: {
         branchController: () => false,
         aSel: "reg1",
         bSel: "immediate",
-        aluOp: "add",
+        aluOp: op,
         memWriteEnable: false,
         wbSel: "alu",
         regWriteEnable: true,
       },
     };
+  }
+
+  const arithmeticInstructions: {
+    name: SupportedInstruction;
+    type: "R" | "I";
+    aluOp: ControlSignals["aluOp"];
+  }[] = [
+    { name: "add", type: "R", aluOp: "add" },
+    { name: "sub", type: "R", aluOp: "sub" },
+    { name: "addi", type: "I", aluOp: "add" },
+    { name: "and", type: "R", aluOp: "and" },
+    { name: "andi", type: "I", aluOp: "and" },
+    { name: "or", type: "R", aluOp: "or" },
+    { name: "ori", type: "I", aluOp: "or" },
+    { name: "xor", type: "R", aluOp: "xor" },
+    { name: "xori", type: "I", aluOp: "xor" },
+    { name: "sll", type: "R", aluOp: "sll" },
+    { name: "slli", type: "I", aluOp: "sll" },
+    { name: "srl", type: "R", aluOp: "srl" },
+    { name: "srli", type: "I", aluOp: "srl" },
+    { name: "sra", type: "R", aluOp: "sra" },
+    { name: "srai", type: "I", aluOp: "sra" },
+  ];
+
+  arithmeticInstructions.forEach(({ name, type, aluOp }) => {
+    parsers.set(name, (raw, remaining) => {
+      if (type === "R") {
+        return getArithmeticRInst(raw, remaining, aluOp);
+      } else {
+        return getArithmeticIInst(raw, remaining, aluOp);
+      }
+    });
   });
 
   function getBranchInst(
@@ -158,11 +199,19 @@ function getParsers() {
 
   parsers.set("beqz", (raw, remaining) => {
     const parsed = parseBzType(remaining);
-    return getBranchInst(raw, parsed, (reg1, reg2) => reg1 === reg2);
+    return getBranchInst(
+      raw,
+      [0, parsed[0], parsed[1]],
+      (reg1, reg2) => reg1 === reg2
+    );
   });
   parsers.set("bnez", (raw, remaining) => {
     const parsed = parseBzType(remaining);
-    return getBranchInst(raw, parsed, (reg1, reg2) => reg1 !== reg2);
+    return getBranchInst(
+      raw,
+      [0, parsed[0], parsed[1]],
+      (reg1, reg2) => reg1 !== reg2
+    );
   });
   parsers.set("beq", (raw, remaining) => {
     const parsed = parseIType(remaining);
@@ -220,6 +269,44 @@ function getParsers() {
         bSel: "immediate",
         aluOp: "add",
         memWriteEnable: true,
+        wbSel: "alu",
+        regWriteEnable: false,
+      },
+    };
+  });
+
+  parsers.set("li", (raw, remaining) => {
+    // pseudo inst for addi
+    const [r, imm] = parseBzType(remaining);
+    return {
+      raw,
+      readingRegisters: [0, undefined],
+      writingRegister: r,
+      immediate: imm,
+      controlSignals: {
+        branchController: () => false,
+        aSel: "reg1",
+        bSel: "immediate",
+        aluOp: "add",
+        memWriteEnable: false,
+        wbSel: "alu",
+        regWriteEnable: true,
+      },
+    };
+  });
+
+  parsers.set("nop", (raw) => {
+    return {
+      raw,
+      readingRegisters: [0, 0],
+      writingRegister: 0,
+      immediate: undefined,
+      controlSignals: {
+        branchController: () => false,
+        aSel: "reg1",
+        bSel: "reg2",
+        aluOp: "add",
+        memWriteEnable: false,
         wbSel: "alu",
         regWriteEnable: false,
       },
@@ -311,7 +398,7 @@ function parseIType(remaining: string): [number, number, string | number] {
   return [registerIndex, resultRegisterIndex, immediate];
 }
 
-function parseBzType(remaining: string): [number, number, string | number] {
+function parseBzType(remaining: string): [number, string | number] {
   const args = remaining.split(",").map((arg) => arg.trim());
   if (args.length !== 2) {
     throw new Error(`Invalid number of arguments`);
@@ -324,7 +411,7 @@ function parseBzType(remaining: string): [number, number, string | number] {
   if (isNaN(immediate)) {
     immediate = args[1];
   }
-  return [0, registerIndex, immediate]; // to align with the I type, the reg2 reader is in front of the reg1 reader
+  return [registerIndex, immediate]; // to align with the I type, the reg2 reader is in front of the reg1 reader
 }
 
 function parseMemType(remaining: string): [number, number, number] {
@@ -376,552 +463,5 @@ export function getDefaultInst(): InstructionType {
     },
   };
 }
-
-// class Instruction {
-//   /**
-//    * The raw instruction string.
-//    */
-//   public raw: string;
-//   /**
-//    * The original index of the instruction in the source code.
-//    * For NOPs, if it is used to fill the instruction memory or init the pipeline,
-//    * it will be undefined.
-//    * If a NOP is converted from a normal instruction to stall, it will be -1.
-//    */
-//   public originalIndex: number | undefined;
-//   constructor(raw: string, originalIndex: number | undefined) {
-//     this.raw = raw;
-//     this.originalIndex = originalIndex;
-//   }
-
-//   get readingRegisters(): [number | undefined, number | undefined] {
-//     throw new Error("readingRegisters unimplemented");
-//   }
-
-//   get writingRegister(): number | undefined {
-//     throw new Error("writingRegister unimplemented");
-//   }
-
-//   get controlSignals(): ControlSignals {
-//     throw new Error("controlSignals unimplemented");
-//   }
-
-//   static default(): AddInstruction {
-//     return new AddInstruction(0, 0, 0, "add $0, $0, $0 #NOP");
-//   }
-
-//   static parse(raw: string, index?: number): Instruction {
-//     const rawParts = raw.split("#");
-//     const parts = rawParts[0].split(" ");
-//     const instructionType = parts[0];
-//     const args = parts
-//       .slice(1)
-//       .join(" ")
-//       .split(",")
-//       .map((arg) => arg.trim());
-
-//     const baseInstruction = new Instruction(raw, index);
-
-//     switch (instructionType) {
-//       case "lw":
-//       case "sw": {
-//         if (args.length !== 2) {
-//           throw new Error(
-//             `Invalid number of arguments for ${instructionType} instruction`
-//           );
-//         }
-//         if (args[0].charAt(0) !== "$") {
-//           throw new Error(`Invalid register format: ${args[0]}`);
-//         }
-//         const registerIndex = parseInt(args[0].substring(1));
-
-//         // args[1] should look like 4($0)
-//         const addressParts = args[1].split("(");
-//         if (addressParts.length !== 2) {
-//           throw new Error(`Invalid address format: ${args[1]}`);
-//         }
-//         const address = parseInt(addressParts[0]);
-//         if (isNaN(address)) {
-//           throw new Error(`Invalid address format: ${args[1]}`);
-//         }
-//         const reg = addressParts[1].substring(0, addressParts[1].length - 1);
-//         if (reg.charAt(0) !== "$") {
-//           throw new Error(`Invalid register format: ${addressParts[1]}`);
-//         }
-//         const addressRegisterIndex = parseInt(reg.substring(1));
-//         if (isNaN(addressRegisterIndex)) {
-//           throw new Error(`Invalid register format: ${reg}`);
-//         }
-//         const iInst = IInstruction.fromInstruction(
-//           baseInstruction,
-//           addressRegisterIndex,
-//           registerIndex,
-//           address
-//         );
-//         if (instructionType === "lw") {
-//           return LwInstruction.fromIInstruction(iInst);
-//         } else {
-//           return SwInstruction.fromIInstruction(iInst);
-//         }
-//       }
-//       case "add": {
-//         if (args.length !== 3) {
-//           throw new Error(
-//             `Invalid number of arguments for ${instructionType} instruction`
-//           );
-//         }
-//         args.forEach((arg) => {
-//           if (arg.charAt(0) !== "$" || isNaN(parseInt(arg.substring(1)))) {
-//             throw new Error(`Invalid register format: ${arg}`);
-//           }
-//         });
-//         const registerIndex1 = parseInt(args[1].substring(1));
-//         const registerIndex2 = parseInt(args[2].substring(1));
-//         const resultRegisterIndex = parseInt(args[0].substring(1));
-//         return AddInstruction.fromRInstruction(
-//           RInstruction.fromInstruction(
-//             baseInstruction,
-//             registerIndex1,
-//             registerIndex2,
-//             resultRegisterIndex
-//           )
-//         );
-//       }
-//       case "addi": {
-//         if (args.length !== 3) {
-//           throw new Error(
-//             `Invalid number of arguments for ${instructionType} instruction`
-//           );
-//         }
-//         args.forEach((arg, i) => {
-//           if (i >= 2) return;
-//           if (arg.charAt(0) !== "$" || isNaN(parseInt(arg.substring(1)))) {
-//             throw new Error(`Invalid register format: ${arg}`);
-//           }
-//         });
-//         const resultRegisterIndex = parseInt(args[0].substring(1));
-//         const registerIndex = parseInt(args[1].substring(1));
-//         const immediate = parseInt(args[2]);
-//         return AddiInstruction.fromIInstruction(
-//           IInstruction.fromInstruction(
-//             baseInstruction,
-//             registerIndex,
-//             resultRegisterIndex,
-//             immediate
-//           )
-//         );
-//       }
-//       case "beqz":
-//       case "bnez": {
-//         if (args.length !== 2) {
-//           throw new Error(
-//             `Invalid number of arguments for ${instructionType} instruction`
-//           );
-//         }
-//         const registerIndex = parseInt(args[0].substring(1));
-//         const offset = parseInt(args[1]);
-//         if (instructionType === "beqz") {
-//           return BeqInstruction.fromIInstruction(
-//             IInstruction.fromInstruction(
-//               baseInstruction,
-//               registerIndex,
-//               0,
-//               offset
-//             )
-//           );
-//         } else {
-//           return BneInstruction.fromIInstruction(
-//             IInstruction.fromInstruction(
-//               baseInstruction,
-//               registerIndex,
-//               0,
-//               offset
-//             )
-//           );
-//         }
-//       }
-//       case "beq":
-//       case "bne": {
-//         if (args.length !== 3) {
-//           throw new Error(
-//             `Invalid number of arguments for ${instructionType} instruction`
-//           );
-//         }
-//         if (
-//           args[0].charAt(0) !== "$" ||
-//           isNaN(parseInt(args[0].substring(1)))
-//         ) {
-//           throw new Error(`Invalid register format: ${args[0]}`);
-//         }
-//         const registerIndex1 = parseInt(args[0].substring(1));
-//         if (
-//           args[1].charAt(0) !== "$" ||
-//           isNaN(parseInt(args[1].substring(1)))
-//         ) {
-//           throw new Error(`Invalid register format: ${args[1]}`);
-//         }
-//         const registerIndex2 = parseInt(args[1].substring(1));
-//         if (isNaN(parseInt(args[2]))) {
-//           throw new Error(`Invalid offset format: ${args[2]}`);
-//         }
-//         const offset = parseInt(args[2]);
-//         if (instructionType === "beq") {
-//           return BeqInstruction.fromIInstruction(
-//             IInstruction.fromInstruction(
-//               baseInstruction,
-//               registerIndex1,
-//               registerIndex2,
-//               offset
-//             )
-//           );
-//         } else {
-//           return BneInstruction.fromIInstruction(
-//             IInstruction.fromInstruction(
-//               baseInstruction,
-//               registerIndex1,
-//               registerIndex2,
-//               offset
-//             )
-//           );
-//         }
-//       }
-//       case "nop": {
-//         return Instruction.default();
-//       }
-
-//       default:
-//         throw new Error(`Unknown instruction type: ${instructionType}`);
-//     }
-//   }
-// }
-
-// class RInstruction extends Instruction {
-//   public rs1: number;
-//   public rs2: number;
-//   public rd: number;
-
-//   constructor(
-//     rs1: number,
-//     rs2: number,
-//     rd: number,
-//     raw: string,
-//     originalIndex?: number
-//   ) {
-//     super(raw, originalIndex);
-//     this.rs1 = rs1;
-//     this.rs2 = rs2;
-//     this.rd = rd;
-//   }
-
-//   static fromInstruction(
-//     inst: Instruction,
-//     rs1: number,
-//     rs2: number,
-//     rd: number
-//   ): RInstruction {
-//     return new RInstruction(rs1, rs2, rd, inst.raw, inst.originalIndex);
-//   }
-// }
-// export class AddInstruction extends RInstruction {
-//   get readingRegisters(): [number | undefined, number | undefined] {
-//     return [this.rs1, this.rs2];
-//   }
-//   get writingRegister(): number {
-//     return this.rd;
-//   }
-//   static fromRInstruction(inst: RInstruction): AddInstruction {
-//     return new AddInstruction(
-//       inst.rs1,
-//       inst.rs2,
-//       inst.rd,
-//       inst.raw,
-//       inst.originalIndex
-//     );
-//   }
-//   get controlSignals(): ControlSignals {
-//     return {
-//       branchController: () => false,
-//       aSel: "reg1",
-//       bSel: "reg2",
-//       aluOp: "add",
-//       memWriteEnable: false,
-//       wbSel: "alu",
-//       regWriteEnable: true,
-//     };
-//   }
-// }
-
-// export class IInstruction extends Instruction {
-//   public rs1: number;
-//   public rd: number;
-//   public immediate: number;
-
-//   constructor(
-//     rs1: number,
-//     rd: number,
-//     immediate: number,
-//     raw: string,
-//     originalIndex?: number
-//   ) {
-//     super(raw, originalIndex);
-//     this.rs1 = rs1;
-//     this.rd = rd;
-//     this.immediate = immediate;
-//   }
-//   static fromInstruction(
-//     inst: Instruction,
-//     rs1: number,
-//     rd: number,
-//     immediate: number
-//   ): IInstruction {
-//     return new IInstruction(rs1, rd, immediate, inst.raw, inst.originalIndex);
-//   }
-// }
-
-// export class LwInstruction extends IInstruction {
-//   get readingRegisters(): [number | undefined, number | undefined] {
-//     return [this.rs1, undefined];
-//   }
-//   get writingRegister(): number {
-//     return this.rd;
-//   }
-//   static fromIInstruction(inst: IInstruction): LwInstruction {
-//     return new LwInstruction(
-//       inst.rs1,
-//       inst.rd,
-//       inst.immediate,
-//       inst.raw,
-//       inst.originalIndex
-//     );
-//   }
-//   get controlSignals(): ControlSignals {
-//     return {
-//       branchController: () => false,
-//       aSel: "reg1",
-//       bSel: "immediate",
-//       aluOp: "add",
-//       memWriteEnable: false,
-//       wbSel: "mem",
-//       regWriteEnable: true,
-//     };
-//   }
-// }
-
-// export class SwInstruction extends IInstruction {
-//   get readingRegisters(): [number | undefined, number | undefined] {
-//     return [this.rs1, this.rd];
-//   }
-//   get writingRegister(): number | undefined {
-//     return undefined;
-//   }
-//   static fromIInstruction(inst: IInstruction): SwInstruction {
-//     return new SwInstruction(
-//       inst.rs1,
-//       inst.rd,
-//       inst.immediate,
-//       inst.raw,
-//       inst.originalIndex
-//     );
-//   }
-//   get controlSignals(): ControlSignals {
-//     return {
-//       branchController: () => false,
-//       aSel: "reg1",
-//       bSel: "immediate",
-//       aluOp: "add",
-//       memWriteEnable: true,
-//       wbSel: "alu", // doesn't matter
-//       regWriteEnable: false,
-//     };
-//   }
-// }
-
-// class BranchInstruction extends IInstruction {
-//   branchController(_reg1: number, _reg2: number): boolean {
-//     throw new Error("branchController unimplemented");
-//   }
-
-//   get readingRegisters(): [number | undefined, number | undefined] {
-//     return [this.rs1, this.rd];
-//   }
-//   get writingRegister(): number | undefined {
-//     return undefined;
-//   }
-//   get controlSignals(): ControlSignals {
-//     return {
-//       branchController: this.branchController,
-//       aSel: "pc",
-//       bSel: "immediate",
-//       aluOp: "add",
-//       memWriteEnable: false,
-//       wbSel: "alu", // doesn't matter
-//       regWriteEnable: false,
-//     };
-//   }
-// }
-
-// export class BeqInstruction extends BranchInstruction {
-//   branchController(_reg1: number, _reg2: number): boolean {
-//     return _reg1 === _reg2;
-//   }
-//   static fromIInstruction(inst: IInstruction): BeqInstruction {
-//     return new BeqInstruction(
-//       inst.rs1,
-//       inst.rd,
-//       inst.immediate,
-//       inst.raw,
-//       inst.originalIndex
-//     );
-//   }
-// }
-
-// export class BneInstruction extends BranchInstruction {
-//   branchController(_reg1: number, _reg2: number): boolean {
-//     return _reg1 !== _reg2;
-//   }
-//   static fromIInstruction(inst: IInstruction): BneInstruction {
-//     return new BneInstruction(
-//       inst.rs1,
-//       inst.rd,
-//       inst.immediate,
-//       inst.raw,
-//       inst.originalIndex
-//     );
-//   }
-// }
-
-// export class AddiInstruction extends IInstruction {
-//   get readingRegisters(): [number | undefined, number | undefined] {
-//     return [this.rs1, undefined];
-//   }
-//   get writingRegister(): number {
-//     return this.rd;
-//   }
-//   static fromIInstruction(inst: IInstruction): AddiInstruction {
-//     return new AddiInstruction(
-//       inst.rs1,
-//       inst.rd,
-//       inst.immediate,
-//       inst.raw,
-//       inst.originalIndex
-//     );
-//   }
-//   get controlSignals(): ControlSignals {
-//     return {
-//       branchController: () => false,
-//       aSel: "reg1",
-//       bSel: "immediate",
-//       aluOp: "add",
-//       memWriteEnable: false,
-//       wbSel: "alu",
-//       regWriteEnable: true,
-//     };
-//   }
-// }
-
-// class LoadSaveInstruction extends Instruction {
-//   public addressOffset: number;
-//   public registerIndex: number;
-//   public startingRegisterIndex: number;
-//   public type: "load" | "store";
-
-//   constructor(
-//     addressOffset: number,
-//     registerIndex: number,
-//     startingRegisterIndex: number,
-//     type: "load" | "store",
-//     raw: string,
-//     originalIndex?: number
-//   ) {
-//     super(raw, originalIndex);
-//     this.addressOffset = addressOffset;
-//     this.registerIndex = registerIndex;
-//     this.startingRegisterIndex = startingRegisterIndex;
-//     this.type = type;
-//   }
-
-//   get rs1(): number {
-//     return this.startingRegisterIndex;
-//   }
-//   get rs2(): number | undefined {
-//     if (this.type === "store") {
-//       return this.registerIndex;
-//     }
-//     return undefined;
-//   }
-//   get rd(): number | undefined {
-//     if (this.type === "load") {
-//       return this.registerIndex;
-//     }
-//     return undefined;
-//   }
-//   get immediate(): number {
-//     return this.addressOffset;
-//   }
-// }
-
-// class ArithmeticInstruction extends Instruction {
-//   public registerIndex1: number;
-//   public registerIndex2: number;
-//   public resultRegisterIndex: number;
-//   public operation: "add";
-
-//   constructor(
-//     registerIndex1: number,
-//     registerIndex2: number,
-//     resultRegisterIndex: number,
-//     operation: "add",
-//     raw: string,
-//     originalIndex?: number
-//   ) {
-//     super(raw, originalIndex);
-//     this.registerIndex1 = registerIndex1;
-//     this.registerIndex2 = registerIndex2;
-//     this.resultRegisterIndex = resultRegisterIndex;
-//     this.operation = operation;
-//   }
-//   get rs1(): number {
-//     return this.registerIndex1;
-//   }
-//   get rs2(): number {
-//     return this.registerIndex2;
-//   }
-//   get rd(): number {
-//     return this.resultRegisterIndex;
-//   }
-//   get immediate(): number | undefined {
-//     return undefined;
-//   }
-// }
-
-// class BranchInstruction extends Instruction {
-//   public type: "beqz";
-//   public registerIndex: number;
-//   public offset: number;
-//   constructor(
-//     type: "beqz",
-//     registerIndex: number,
-//     offset: number,
-//     raw: string,
-//     originalIndex?: number
-//   ) {
-//     super(raw, originalIndex);
-//     this.type = type;
-//     this.registerIndex = registerIndex;
-//     this.offset = offset;
-//   }
-//   get rs1(): number {
-//     return this.registerIndex;
-//   }
-//   get rs2(): number | undefined {
-//     return undefined;
-//   }
-//   get rd(): number | undefined {
-//     return undefined;
-//   }
-//   get immediate(): number {
-//     return this.offset;
-//   }
-// }
 
 export type { InstructionType as Instruction };

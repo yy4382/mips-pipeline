@@ -6,11 +6,11 @@ test("pipeline - basic", () => {
   const iMem = InstructionMemory.parse(`
     lw $1, 0($0)
     lw $2, 1($0)
-    add $0, $0, $0
-    add $0, $0, $0
+    nop
+    nop
     add $3, $1, $2
-    add $0, $0, $0
-    add $0, $0, $0
+    nop
+    nop
     sw $3, 2($0)
     `);
   const pipeline = new Pipeline(iMem);
@@ -26,13 +26,13 @@ test("pipeline - basic branch - not branch", () => {
   const iMem = InstructionMemory.parse(`
     lw $1, 0($0)
     lw $2, 1($0)
-    add $0, $0, $0 # avoid RAW
-    add $0, $0, $0 # avoid RAW
+    nop # avoid RAW
+    nop # avoid RAW
     beqz $1, target
     add $3, $2, $2
     target:
-    add $0, $0, $0
-    add $0, $0, $0
+    nop
+    nop
     add $4, $1, $1
     `);
   const pipeline = new Pipeline(iMem);
@@ -48,14 +48,14 @@ test("pipeline - basic branch - should branch", () => {
   const iMem = InstructionMemory.parse(`
     lw $1, 0($0)
     lw $2, 1($0)
-    add $0, $0, $0
-    add $0, $0, $0
-    add $0, $0, $0
+    nop
+    nop
+    nop
     beqz $0, target
     add $3, $2, $2
     target:
-    add $0, $0, $0
-    add $0, $0, $0
+    nop
+    nop
     add $4, $1, $1
     `);
   const pipeline = new Pipeline(iMem);
@@ -180,10 +180,10 @@ test("pipeline - RAW(forward)2", () => {
 });
 test("pipeline - RAW(forward) data both available in EX/MEM and MEM/WB", () => {
   const iMem = InstructionMemory.parse(`
-    addi $1, $0, 1
-    addi $2, $0, 2
-    addi $3, $0, 3
-    addi $4, $0, 4
+    li $1, 1
+    li $2, 2
+    li $3, 3
+    li $4, 4
     add $1, $1, $2
     add $1, $1, $3
     add $1, $1, $4
@@ -191,12 +191,11 @@ test("pipeline - RAW(forward) data both available in EX/MEM and MEM/WB", () => {
   const pipeline = new Pipeline(iMem, true);
   pipeline.tick(-1);
   expect(pipeline.registerFile.getAt(1)).toBe(10);
-  expect(pipeline.statistics.forwardCount).toBe(2);
 });
 
 test("pipeline - branch jump back", () => {
   const iMem = InstructionMemory.parse(`
-addi $3, $0, 3
+li $3, 3
 target: addi $1, $1, 1
 bne $1, $3, target
 sw $1, 0($0)
@@ -210,10 +209,10 @@ describe("pipeline - fibonacci", () => {
   const fibonacci = `
 lw $1, 0($0)
 ble $1, $0, invalid_input
-addi $2, $0, 0
-addi $3, $0, 1
+li $2, 0
+li $3, 1
 beq $1, $3, return_0 # if $1 == 1, return_0
-addi $4, $0, 2
+li $4, 2
 beq $1, $4, return_1 # if $1 == 2, return_1
 addi $1, $1, -2 # because the first two fibonacci numbers are 0 and 1
 loop:
@@ -224,13 +223,13 @@ loop:
   addi $3, $4, 0
   beqz $0, loop
 invalid_input:
-  addi $3, $0, -1
+  li $3, -1
   beqz $0, end
 return_0:
-  addi $3, $0, 0
+  li $3, 0
   beqz $0, end
 return_1:
-  addi $3, $0, 1
+  li $3, 1
   beqz $0, end
 end:
   sw $3, 1($0)

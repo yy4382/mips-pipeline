@@ -3,6 +3,7 @@ import { InstructionMemory } from "./hardware/instruction-memory";
 import { Memory } from "./hardware/memory";
 import { RegisterFile } from "./hardware/register-file";
 import {
+  aluHandler,
   getDefaultPipelineRegs,
   PipelineRegs,
 } from "./hardware/pipeline-registers";
@@ -274,8 +275,10 @@ export class Pipeline {
 
       let result;
 
-      if (inst.controlSignals.aluOp === "add") {
-        result = num1 + num2;
+      const handler = aluHandler.get(inst.controlSignals.aluOp);
+
+      if (handler) {
+        result = handler(num1, num2);
       } else {
         throw new Error("Unknown ALU operation");
       }

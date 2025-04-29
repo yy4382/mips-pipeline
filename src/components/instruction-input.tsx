@@ -17,9 +17,9 @@ sw $3, 2($0)`,
     insts: `# This is a test case for branch with RAW
 # the tricky part is that the register used in branch instruction itself has a RAW dependency 
 # (which is not a corner case that need to handle specifically if RAW and branching are implemented correctly)
-addi $1, $0, 1
-addi $2, $0, 2
-addi $3, $0, 0
+li $1, 1
+li $2, 2
+li $3, 0
 beqz $3, target
 add $4, $1, $2
 target:
@@ -37,10 +37,10 @@ sw $5, 1($0)
 
 lw $1, 0($0)
 ble $1, $0, invalid_input
-addi $2, $0, 0
-addi $3, $0, 1
+li $2, 0
+li $3, 1
 beq $1, $3, return_0 # if $1 == 1, return_0
-addi $4, $0, 2
+li $4, 2
 beq $1, $4, return_1 # if $1 == 2, return_1
 addi $1, $1, -2 # because the first two fibonacci numbers are 0 and 1
 loop:
@@ -51,13 +51,13 @@ loop:
   addi $3, $4, 0
   beqz $0, loop
 invalid_input:
-  addi $3, $0, -1
+  li $3, -1
   beqz $0, end
 return_0:
-  addi $3, $0, 0
+  li $3, 0
   beqz $0, end
 return_1:
-  addi $3, $0, 1
+  li $3, 1
   beqz $0, end
 end:
   sw $3, 1($0)

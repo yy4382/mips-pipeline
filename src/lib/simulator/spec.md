@@ -27,19 +27,20 @@
 
 ### 支持的指令
 
-- 算数类 `add, sub, addi`
+- 算数类 `add, sub, addi, and, andi, or, ori, xor, xori, sll, slli, srl, srli, sra, srai`
 - 内存类 `lw, sw`
-- 分支类 `beq, beqz, bne, bnez, blt, bgt, ble, bge`
+- 分支类 `beq, bne, blt, bgt, ble, bge`
+- pseudo-instruction `li, nop, beqz, bnez`
+
+> MIPS 中的 blt 等指令是 pseudo-instruction，实际上是用 `slt` 和 `bne` 实现的。为了简化实现，这里采用了类似 RISC-V 的实现方式，直接支持 `blt` 等指令。
 
 除了 `beqz` 和 `bnez` 其他一些常见的“伪指令”没有被支持。因此，
-  - `li` 可用 `addi` 代替
-  - `nop` 是 `add $0, $0, $0`
   - `mv` 可用 `add` 代替
   - `j` 可用 `beq $0, $0, target` 代替
 
 对于跳转标签，可以和指令写在一行，也可以单独写在一行。
 
-不支持 `.data` 和 `.text` 这样的伪指令。
+不支持 `.data` 和 `.text` 这样的 assembler directive。
 
 
 ## 流水线详情

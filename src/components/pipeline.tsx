@@ -23,11 +23,11 @@ import { HazardForwardViewer } from "./hazard-forward-viewer";
 const DEFAULT_INSTRUCTION = `
 lw $1, 0($0)
 lw $2, 1($0)
-add $0, $0, $0
-add $0, $0, $0
+nop
+nop
 add $3, $1, $2
-add $0, $0, $0
-add $0, $0, $0
+nop
+nop
 sw $3, 2($0)
 `;
 
