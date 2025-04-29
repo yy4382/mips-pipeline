@@ -141,7 +141,7 @@ function getParsers() {
   ): InstructionTypeFirstPassWithoutIndex {
     return {
       raw,
-      readingRegisters: [parsed[0], parsed[1]],
+      readingRegisters: [parsed[1], parsed[0]], // reversed because most b inst are I type, which has a rs1 behind rd
       writingRegister: undefined,
       immediate: parsed[2],
       controlSignals: {
@@ -324,7 +324,7 @@ function parseBzType(remaining: string): [number, number, string | number] {
   if (isNaN(immediate)) {
     immediate = args[1];
   }
-  return [registerIndex, 0, immediate];
+  return [0, registerIndex, immediate]; // to align with the I type, the reg2 reader is in front of the reg1 reader
 }
 
 function parseMemType(remaining: string): [number, number, number] {
