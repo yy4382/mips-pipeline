@@ -62,6 +62,7 @@ export class Pipeline {
   }
 
   /**
+   * Run the pipeline for a given number of cycles. See doc for `stopAt` param  for more detail
    *
    * @param stopAt undefined means run 1 tick, -1 means runs to end, other means runs to IF of that inst
    * @param hazardCallback
@@ -73,22 +74,33 @@ export class Pipeline {
     forwardCb: (arg: ForwardDetail) => void = () => {},
     tickCallback: (arg: Pipeline) => void = () => {}
   ) {
+    const MAX_RUN_LOOP = 5000;
     if (stopAt === undefined) {
       this._tick(hazardCallback, forwardCb);
       tickCallback(this);
       return;
     }
     if (stopAt === -1) {
+      let loopCount = 0;
       while (!this.isFinished()) {
+        loopCount += 1;
+        if (loopCount > MAX_RUN_LOOP) {
+          throw new Error("Infinite loop when in pipeline run");
+        }
         this._tick(hazardCallback, forwardCb);
         tickCallback(this);
       }
       return;
     }
+    let loopCount = 0;
     while (
       this.iMem.getInstructionAt(this.pc).originalIndex !== stopAt &&
       !this.isFinished()
     ) {
+      loopCount += 1;
+      if (loopCount > MAX_RUN_LOOP) {
+        throw new Error("Infinite loop when in pipeline run");
+      }
       this._tick(hazardCallback, forwardCb);
       tickCallback(this);
     }
