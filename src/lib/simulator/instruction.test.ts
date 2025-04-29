@@ -49,6 +49,14 @@ describe("parseInstruction", () => {
     expect(inst.immediate).toBe(4);
     expect(inst.writingRegister).toBe(undefined);
   });
+  test("parseInstruction - blt instruction", () => {
+    const inst = Is.parseInsts(["blt $1, $2, 4"])[0];
+    expect(inst.raw).toBe("blt $1, $2, 4");
+
+    expect(inst.readingRegisters).toEqual([1, 2]);
+    expect(inst.immediate).toBe(4);
+    expect(inst.writingRegister).toBe(undefined);
+  })
   test("parseInstruction: label", () => {
     const insts = Is.parseInsts(
       `
