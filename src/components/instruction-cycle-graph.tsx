@@ -68,7 +68,7 @@ export function InstructionCycleGraph({ data }: InstructionCycleGraphProps) {
       <CardHeader>
         <CardTitle>Instruction Cycle Graph</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="overflow-x-scroll">
         <svg
           width={svgWidth}
           height={svgHeight}

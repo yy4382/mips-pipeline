@@ -7,7 +7,7 @@ export function HazardForwardViewer({ hazards }: { hazards: JSX.Element[] }) {
       <CardHeader>
         <CardTitle>Hazards & Forwards</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="max-h-96 overflow-y-scroll">
         <div className="flex flex-col gap-3">
           {hazards.length === 0 && (
             <div className="text-muted-foreground">No hazards detected</div>

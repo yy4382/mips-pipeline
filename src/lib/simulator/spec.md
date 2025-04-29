@@ -25,35 +25,22 @@
 
 和 PC 类似，因为没有"字节"概念，每次访问内存时都直接取取一个寄存器长度的内存单元。(lw, sw 里的 word的意思也随之变换为一个寄存器长度的内存单元)
 
-### 支持的指令格式
+### 支持的指令
 
-##### lw (load word)
-- `lw $1, 4($2)`  # $1 = mem[$2 + 4]
+- 算数类 `add, sub, addi`
+- 内存类 `lw, sw`
+- 分支类 `beq, beqz, bne, bnez, blt, bgt, ble, bge`
 
-##### sw (store word)
-- `sw $1, 4($2)`  # mem[$2 + 4] = $1
+除了 `beqz` 和 `bnez` 其他一些常见的“伪指令”没有被支持。因此，
+  - `li` 可用 `addi` 代替
+  - `nop` 是 `add $0, $0, $0`
+  - `mv` 可用 `add` 代替
+  - `j` 可用 `beq $0, $0, target` 代替
 
-##### add
-- `add $1, $2, $3`  # $1 = $2 + $3
+对于跳转标签，可以和指令写在一行，也可以单独写在一行。
 
-##### addi (add immediate)
-- `addi $1, $2, 10`  # $1 = $2 + 10
+不支持 `.data` 和 `.text` 这样的伪指令。
 
-##### beq (branch if equal)
-- `beq $1, $2, 4`  # if ($1 == $2) pc = pc + 4
-- `beq $1, $2, -2`  # if ($1 == $2) pc = pc - 2
-
-##### bne (branch if not equal)
-- `bne $1, $2, 4`  # if ($1 != $2) pc = pc + 4
-- `bne $1, $2, -2`  # if ($1 != $2) pc = pc - 2
-
-##### beqz (branch if equal to zero)
-- `beqz $1, 4`  # if ($1 == 0) pc = pc + 4
-- `beqz $1, -2`  # if ($1 == 0) pc = pc - 2
-
-##### bnez (branch if not equal to zero)
-- `bnez $1, 4`  # if ($1 != 0) pc = pc + 4
-- `bnez $1, -2`  # if ($1 != 0) pc = pc - 2
 
 ## 流水线详情
 
