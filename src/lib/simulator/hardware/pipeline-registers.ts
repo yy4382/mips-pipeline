@@ -1,4 +1,4 @@
-import { Instruction } from "../instruction";
+import { getDefaultInst, Instruction } from "../instruction";
 
 export type PipelineRegs = {
   mem2wb: {
@@ -29,7 +29,7 @@ export type ControlSignals = {
   branchController: (reg1: number, reg2: number) => boolean;
   aSel: "reg1" | "pc";
   bSel: "reg2" | "immediate";
-  aluOp: "add";
+  aluOp: "add" | "sub";
 
   // MEM Control
   memWriteEnable: boolean;
@@ -41,15 +41,15 @@ export type ControlSignals = {
 
 export function getDefaultPipelineRegs(): PipelineRegs {
   return {
-    mem2wb: { inst: Instruction.default(), mem: 0, alu: 0 },
-    ex2mem: { inst: Instruction.default(), alu_out: 0, write_data: 0 },
+    mem2wb: { inst: getDefaultInst(), mem: 0, alu: 0 },
+    ex2mem: { inst: getDefaultInst(), alu_out: 0, write_data: 0 },
     id2ex: {
-      inst: Instruction.default(),
+      inst: getDefaultInst(),
       reg1: 0,
       reg2: 0,
       pc: 0,
       immediate: 0,
     },
-    if2id: { inst: Instruction.default(), pc: 0 },
+    if2id: { inst: getDefaultInst(), pc: 0 },
   };
 }

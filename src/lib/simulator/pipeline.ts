@@ -1,4 +1,5 @@
-import { Instruction, InstructionMemory, IInstruction } from "./instruction";
+import { Instruction } from "./instruction";
+import { InstructionMemory } from "./hardware/instruction-memory";
 import { Memory } from "./hardware/memory";
 import { RegisterFile } from "./hardware/register-file";
 import {
@@ -269,7 +270,7 @@ export class Pipeline {
 
     const reg1 = this.registerFile.getAt(inst.readingRegisters[0] ?? 0);
     const reg2 = this.registerFile.getAt(inst.readingRegisters[1] ?? 0);
-    const immediate = inst instanceof IInstruction ? inst.immediate : 0;
+    const immediate = inst.immediate ?? 0;
     return getReturn(reg1, reg2, immediate);
   }
   instFetchStage(instIndex: number): PipelineRegs["if2id"] {

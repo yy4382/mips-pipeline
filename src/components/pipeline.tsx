@@ -4,7 +4,7 @@ import {
   HazardCallback,
   Pipeline,
 } from "../lib/simulator/pipeline";
-import { InstructionMemory } from "../lib/simulator/instruction";
+import { InstructionMemory } from "../lib/simulator/hardware/instruction-memory";
 import {
   InstWithStage,
   parseInstWithStage,
