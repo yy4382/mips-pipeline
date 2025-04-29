@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { type JSX, useCallback, useRef, useState } from "react";
 import {
   ForwardDetail,
   HazardCallback,
@@ -18,6 +18,7 @@ import { RegisterFileViewer } from "./register-file-viewer";
 import { Statistics } from "./statistics";
 import { PipelineControls } from "./pipeline-controls";
 import { InstructionCycleGraph } from "./instruction-cycle-graph"; // Import the new component
+import { HazardForwardViewer } from "./hazard-forward-viewer";
 
 const DEFAULT_INSTRUCTION = `
 lw $1, 0($0)
@@ -48,32 +49,47 @@ export function PipelineComp() {
   const [registerFile, setRegisterFile] = useState(
     pipelineRef.current.registerFile.getRegisters()
   );
+  const [hazards, setHazards] = useState<JSX.Element[]>([]);
 
-  const hazardCallback = useCallback<HazardCallback>((type, cause) => {
-    toast(
-      <div>
-        <p className="text-lg">
-          {String(type).charAt(0).toUpperCase() + String(type).slice(1)} Hazard
-          happens
-        </p>
-        <p className="text-sm">
-          "{cause.inst.raw}" at index {cause.inst.originalIndex}
-        </p>
-        <p className="text-sm text-neutral-500">{cause.desc}</p>
-      </div>
-    );
-  }, []);
-  const forwardCallback = useCallback((detail: ForwardDetail) => {
-    toast(
-      <div>
-        <p className="text-lg">Forwarding happens</p>
-        <p className="text-sm">
-          Forwarding "{detail.data}" from "{detail.source.inst.raw}" to "
-          {detail.target.inst.raw}" in register {detail.target.regIndex}
-        </p>
-      </div>
-    );
-  }, []);
+  const hazardCallback = useCallback<
+    (runningMode: "step" | "run") => HazardCallback
+  >(
+    (runningMode) => (type, cause) => {
+      const ele = (
+        <div>
+          <p className="text-lg">
+            {String(type).charAt(0).toUpperCase() + String(type).slice(1)}{" "}
+            Hazard happens at clock cycle {cause.clockCycle}
+          </p>
+          <p className="text-sm">
+            "{cause.inst.raw}" at index {cause.inst.originalIndex}
+          </p>
+          <p className="text-sm text-neutral-500">{cause.desc}</p>
+        </div>
+      );
+      if (runningMode === "step") toast(ele);
+      setHazards((prev) => [...prev, ele]);
+    },
+    []
+  );
+  const forwardCallback = useCallback(
+    (runningMode: "step" | "run") => (detail: ForwardDetail) => {
+      const ele = (
+        <div>
+          <p className="text-lg">
+            Forwarding happens at clock cycle {detail.clockCycle}
+          </p>
+          <p className="text-sm">
+            Forwarding "{detail.data}" from "{detail.source.inst.raw}" to "
+            {detail.target.inst.raw}" in register {detail.target.regIndex}
+          </p>
+        </div>
+      );
+      if (runningMode === "step") toast(ele);
+      setHazards((prev) => [...prev, ele]);
+    },
+    []
+  );
 
   const tickCallback = useCallback((pipeline: Pipeline) => {
     setPipelineRegs(pipeline.pipelineRegs);
@@ -96,10 +112,11 @@ export function PipelineComp() {
   }, []);
 
   const handleTick = (stopAt: number | undefined) => {
+    const mode = stopAt === undefined ? "step" : "run";
     pipelineRef.current.tick(
       stopAt,
-      hazardCallback,
-      forwardCallback,
+      hazardCallback(mode),
+      forwardCallback(mode),
       tickCallback
     );
   };
@@ -120,6 +137,7 @@ export function PipelineComp() {
     ]);
     setMemory(pipelineRef.current.mem.getMemory());
     setRegisterFile(pipelineRef.current.registerFile.getRegisters());
+    setHazards([]);
   }, []);
 
   const handleReset = () => {
@@ -160,6 +178,7 @@ export function PipelineComp() {
         <div className="lg:col-span-2 flex flex-col gap-6">
           <PipelineView pipelineRegs={pipelineRegs} />
           <Statistics statistics={statistics} forwardStatus={useForwarding} />
+          <HazardForwardViewer hazards={hazards} />
         </div>
 
         {/* Right column (3/5 width) */}

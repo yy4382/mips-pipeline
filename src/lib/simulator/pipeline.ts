@@ -9,13 +9,19 @@ import {
 
 export type HazardCallback = (
   type: "branch" | "data",
-  cause: { inst: Instruction; desc: string }
+  cause: { inst: Instruction; desc: string; clockCycle: number }
 ) => void;
 
 export type ForwardDetail = {
   target: { inst: Instruction; regIndex: number };
   source: { inst: Instruction; regIndex: number };
   data: number;
+  // note: in my code forwarding is happened when the inst to be forwarded just
+  // finished the ID stage and the EX stage haven't started yet (clock cycle haven't
+  // changed)
+  // But usually we consider the forwarding happens in EX, before getting into the ALU
+  // So i will set this to this.statistics.clockCycles + 1
+  clockCycle: number;
 };
 
 export type Statistics = {
@@ -119,6 +125,7 @@ export class Pipeline {
       hazardCallback("branch", {
         inst: newPipelineRegs.ex2mem.inst,
         desc: "branch prediction failed, flushed the first two stages`",
+        clockCycle: this.statistics.clockCycles,
       });
       this.statistics.predictFails += 1;
 
@@ -132,7 +139,16 @@ export class Pipeline {
         const addForwardCount = () => {
           this.statistics.forwardCount += 1;
         };
-        hazard = tryForward(newPipelineRegs, forwardCb, addForwardCount);
+        const forwardCbWithoutClockCycle = (
+          arg: Omit<ForwardDetail, "clockCycle">
+        ) => {
+          forwardCb({ ...arg, clockCycle: this.statistics.clockCycles + 1 });
+        };
+        hazard = tryForward(
+          newPipelineRegs,
+          forwardCbWithoutClockCycle,
+          addForwardCount
+        );
       } else {
         hazard = calculateHazards(newPipelineRegs);
       }
@@ -141,6 +157,7 @@ export class Pipeline {
         hazardCallback("data", {
           inst: newPipelineRegs.id2ex.inst,
           desc: "data hazard detected, inserted a bubble to ID/EX registers and prevented first two stages to move on",
+          clockCycle: this.statistics.clockCycles,
         });
         this.statistics.dataHazardStalls += 1;
 
@@ -325,7 +342,10 @@ function calculateHazards(pipelineRegs: PipelineRegs): boolean {
 function checkForwardingForRegister(
   targetRegIndex: number | undefined,
   pipelineRegs: PipelineRegs
-): { needsStall: boolean; forwardDetail?: Omit<ForwardDetail, "target"> } {
+): {
+  needsStall: boolean;
+  forwardDetail?: Omit<ForwardDetail, "target" | "clockCycle">;
+} {
   // Check EX/MEM stage for collision
   if (
     regIndexCollision(targetRegIndex, pipelineRegs.ex2mem.inst.writingRegister)
@@ -380,7 +400,7 @@ function checkForwardingForRegister(
  */
 function tryForward(
   pipelineRegs: PipelineRegs,
-  forwardCb: (arg: ForwardDetail) => void,
+  forwardCb: (arg: Omit<ForwardDetail, "clockCycle">) => void,
   addForwardCount: () => void
 ): boolean {
   const results = pipelineRegs.id2ex.inst.readingRegisters.map((regIndex) => {
@@ -401,7 +421,7 @@ function tryForward(
       } else {
         pipelineRegs.id2ex.reg2 = result[0].forwardDetail.data;
       }
-      const detail: ForwardDetail = {
+      const detail: Omit<ForwardDetail, "clockCycle"> = {
         ...result[0].forwardDetail,
         target: {
           inst: pipelineRegs.id2ex.inst,

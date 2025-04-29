@@ -22,13 +22,27 @@ export function PipelineControls({
   return (
     <div className="flex flex-wrap gap-4 items-center justify-center p-2 border rounded-lg bg-slate-50 dark:bg-slate-900 w-fit mx-auto">
       <div className="flex gap-2">
-        <Button onClick={() => onTick(undefined)}>Step</Button>
-        <Button onClick={() => onTick(-1)}>Run to End</Button>
+        <Button
+          onClick={() => {
+            onTick(undefined);
+          }}
+        >
+          Step
+        </Button>
+        <Button
+          onClick={() => {
+            onTick(-1);
+          }}
+        >
+          Run to End
+        </Button>
       </div>
-      
+
       <div className="flex items-center gap-2 border-l pl-4">
         <div className="flex items-center gap-2">
-          <Label htmlFor="breakpoint-input" className="whitespace-nowrap">Breakpoint:</Label>
+          <Label htmlFor="breakpoint-input" className="whitespace-nowrap">
+            Breakpoint:
+          </Label>
           <Input
             id="breakpoint-input"
             type="number"
@@ -39,8 +53,10 @@ export function PipelineControls({
             }}
           />
         </div>
-        <Button 
-          onClick={() => onTick(breakpoint)} 
+        <Button
+          onClick={() => {
+            onTick(breakpoint);
+          }}
           variant="outline"
           disabled={breakpoint === 0}
           className="whitespace-nowrap"
@@ -48,20 +64,22 @@ export function PipelineControls({
           Run to BP
         </Button>
       </div>
-      
+
       <div className="flex items-center gap-2 border-l pl-4">
         <Button onClick={onReset} variant="destructive" size="sm">
           Reset
         </Button>
       </div>
-      
+
       <div className="flex items-center gap-2 border-l pl-4">
         <Switch
           id="forward-mode"
           checked={useForwarding}
           onCheckedChange={onForwardingChange}
         />
-        <Label htmlFor="forward-mode" className="cursor-pointer">Forward Mode</Label>
+        <Label htmlFor="forward-mode" className="cursor-pointer">
+          Forward Mode
+        </Label>
       </div>
     </div>
   );
