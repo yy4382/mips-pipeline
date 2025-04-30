@@ -19,13 +19,14 @@ sw $t3, 2($0)`,
 # (which is not a corner case that need to handle specifically if RAW and branching are implemented correctly)
 li $t1, 1
 li $t2, 2
-li $t3, 0
+lw $t3, 0($0)
 beqz $t3, target
+add $t4, $t1, $t2
 add $t4, $t1, $t2
 target:
 add $t5, $t1, $t2
-sw $t4, 0($0)
-sw $t5, 1($0)
+sw $t4, 1($0)
+sw $t5, 2($0)
 `,
   },
   {
