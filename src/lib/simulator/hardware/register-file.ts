@@ -53,3 +53,72 @@ export class RegisterFile {
     return [...this.registers];
   }
 }
+
+const registerNameMapping: Record<string, number> = {
+  $zero: 0,
+  $at: 1,
+  $v0: 2,
+  $v1: 3,
+  $a0: 4,
+  $a1: 5,
+  $a2: 6,
+  $a3: 7,
+  $t0: 8,
+  $t1: 9,
+  $t2: 10,
+  $t3: 11,
+  $t4: 12,
+  $t5: 13,
+  $t6: 14,
+  $t7: 15,
+  $s0: 16,
+  $s1: 17,
+  $s2: 18,
+  $s3: 19,
+  $s4: 20,
+  $s5: 21,
+  $s6: 22,
+  $s7: 23,
+  $t8: 24,
+  $t9: 25,
+  $k0: 26,
+  $k1: 27,
+  $gp: 28,
+  $sp: 29,
+  $fp: 30,
+  $ra: 31,
+};
+
+export function getRegisterIndex(str: string) {
+  const trimmed = str.trim();
+  if (trimmed.charAt(0) !== "$" || trimmed.length < 2) {
+    throw new Error(`Invalid register name: ${str}`);
+  }
+  if (trimmed.length === 2) {
+    const index = parseInt(trimmed.substring(1), 10);
+    if (isNaN(index) || index < 0 || index >= REGISTER_FILE_SIZE) {
+      throw new Error(`Invalid register index: ${str}`);
+    }
+    return index;
+  }
+  const index = registerNameMapping[trimmed];
+  if (index === undefined) {
+    throw new Error(`Invalid register name: ${str}`);
+  }
+  return index;
+}
+
+export function getRegisterName(index: number) {
+  if (index < 0 || index >= REGISTER_FILE_SIZE) {
+    throw new Error(`Invalid register index: ${index}`);
+  }
+  if (index === 0) {
+    return "$0";
+  }
+  for (const [name, idx] of Object.entries(registerNameMapping)) {
+    if (idx === index) {
+      return name;
+    }
+  }
+  return `$${index}`; // Fallback to numeric representation
+}

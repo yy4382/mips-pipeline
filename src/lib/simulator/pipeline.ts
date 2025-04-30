@@ -137,7 +137,7 @@ export class Pipeline {
       );
       hazardCallback("branch", {
         inst: newPipelineRegs.ex2mem.inst,
-        desc: "branch prediction failed, flushed the first two stages`",
+        desc: "branch prediction failed, flushed the first two stages",
         clockCycle: this.statistics.clockCycles,
       });
       this.statistics.predictFails += 1;

@@ -34,26 +34,36 @@ D. 使用课堂讲授的内容，对上述每一种场景进行分析
 
 #### 汇编器的简化实现
 
-本次实验实现了一个简单的命令解析器，不支持伪指令 (`.text`, `.data` etc.)，但支持除了位运算和无符号数运算之外的大部分普通指令，包括：
+本次实验实现了一个简单的命令解析器，不支持伪指令 (`.text`, `.data` etc.)，但支持除了无符号数运算之外的大部分普通指令，包括：
 
 - 算数类 `add, sub, addi, and, andi, or, ori, xor, xori, sll, slli, srl, srli, sra, srai`
 - 内存类 `lw, sw`
 - 分支类 `beq, bne, blt, bgt, ble, bge`
-- pseudo-instruction `li, nop, beqz, bnez`
+- pseudo-instruction `li, nop, beqz, bnez, mv, j`
 
 > MIPS 中的 blt 等指令是 pseudo-instruction，实际上是用 `slt` 和 `bne` 实现的。为了简化实现，这里采用了类似 RISC-V 的实现方式，直接支持 `blt` 等指令。
 
+> 伪指令的实现方式：
+> - `li` 使用 `addi`
+> - `nop` 使用 `add $0, $0, $0`
+> - `beqz $t1, label` 使用 `beq $t1, $0, label`
+> - `bnez $t1, label` 使用 `bne $t1, $0, label`
+> - `mv $t1, $t2` 使用 `addi $t1, $t2, 0`
+> - `j label` 使用 `beq $0, $0, label`（不符合 MIPS 标准）
+
 对于跳转标签，可以和指令写在一行，也可以单独写在一行。
 
-只能使用 `$0` 这样的寄存器表示法，不能使用 `$t0` 这样的寄存器别名。
-
-不支持 `.data` 和 `.text` 这样的 assembler directive。
+支持 `$0` 这样的寄存器表示法，也支持使用 `$t0` 这样的寄存器别名。
 
 #### iMem, dMem 和 Register-file 的简化实现
 
-由于 JavaScript 中所有数都是 IEEE 754 双精度浮点数。
+出于方便考虑，我对简化了指令和内存的编号访问方式。将一个寄存器的长度设为一个“单位”；iMem 和 dMem 都实现为“单位”的数组，按“单位”来访问。
 
-出于同样的原因，我对简化了指令和内存的编号访问方式。将一个寄存器的长度设为一个“单位”；iMem 和 dMem 也都按“单位”来访问。例如，`load $1, 0($0)` 代表将 dMem[0] 的值加载到寄存器 $1 中，`load $1, 1($0)` 代表将 dMem[1] 的值加载到寄存器 $1 中；PC 为 0 时，取 iMem[0] 指令，PC 为 1 时，取 iMem[1] 指令。
+例如，
+- `lw $1, 0($0)` 代表将 dMem[0] 的值加载到寄存器 $1 中；
+- `lw $1, 1($0)` 代表将 dMem[1] 的值加载到寄存器 $1 中；
+- PC 为 0 时，取 iMem[0] 指令；
+- PC 为 1 时，取 iMem[1] 指令。
 
 这样的简化主要是因为 JavaScript 中所有数字都是 IEEE 754 双精度浮点数，无法直接表示 32 位整数，这样将一个双精度浮点是当作一个“单位”对于「模拟流水线」的目标来说差异并不太大，但是在实现上会简单很多。
 
@@ -63,7 +73,7 @@ D. 使用课堂讲授的内容，对上述每一种场景进行分析
 
 模拟了一个标准的 MIPS 5 段流水线，IF, ID, EX, MEM 和 WB，存储了每个阶段之间的流水线寄存器的值。
 
-支持在硬件层面（非汇编器添加 NOP）实现 data hazard 自动插入 STALL。
+支持在硬件层面（而不是依赖汇编器添加 NOP）实现 data hazard 自动插入 STALL。
 
 分支时，总是预测为不跳转，如果预测失败，则 flush 流水线。
 
@@ -108,19 +118,19 @@ D. 使用课堂讲授的内容，对上述每一种场景进行分析
 
 运行结果在下一个章节。
 
-测试 1 是网页打开后的默认指令；测试 2、测试 5 和测试 6 的代码可以在网页上指令输入框下方的快速选择中直接载入。
+测试 1 是网页打开后的默认指令；测试 2、测试 5 和测试 7 的代码可以在网页上指令输入框下方的快速选择中直接载入。
 
 ### 1. 简单的、没有任何流水线冲突的代码
 
 ```assembly
-lw $1, 0($0)
-lw $2, 1($0)
+lw $t1, 0($0)
+lw $t2, 1($0)
 nop
 nop
-add $3, $1, $2
+add $t3, $t1, $t2
 nop
 nop
-sw $3, 2($0)
+sw $t3, 2($0)
 ```
 
 由于在硬件实现上决定了 `$0` 永远是 0 且无法写入，该段代码没有任何冲突。
@@ -128,10 +138,10 @@ sw $3, 2($0)
 ### 2. RAW 冲突
 
 ```assembly
-lw $1, 0($0)
-lw $2, 1($0)
-add $3, $1, $2
-sw $3, 2($0)
+lw $t1, 0($0)
+lw $t2, 1($0)
+add $t3, $t1, $t2
+sw $t3, 2($0)
 ```
 
 不采用定向路径时，第三条指令(`index = 2`)会停顿两个周期，第四条(`index = 3`)也会停顿两个周期。（直到 WB 阶段完成后才能执行下一条的 ID 阶段）。执行结束后，共停顿 4 个周期。
@@ -170,15 +180,15 @@ add $4, $1, $1 # Execution continues here
 如果正确实现了 RAW 和 branch 的冲突检测，那么这不应该是一个需要特殊处理的情况。
 
 ```assembly
-li $1, 1
-li $2, 2
-li $3, 0
-beqz $3, target
-add $4, $1, $2
+li $t1, 1
+li $t2, 2
+li $t3, 0
+beqz $t3, target
+add $t4, $t1, $t2
 target:
-add $5, $1, $2
-sw $4, 0($0)
-sw $5, 1($0)
+add $t5, $t1, $t2
+sw $t4, 0($0)
+sw $t5, 1($0)
 ```
 
 最后应该可以看到 `$4` 为 0， `$5` 是 3 （内存和寄存器组件的显示在旧版浏览器中可能略有问题，最新版 Chrome 135 中一切正常）
@@ -186,13 +196,10 @@ sw $5, 1($0)
 ### 6. 数据定向时需要的寄存器在 EX/MEM 和 MEM/WB 阶段的指令都将被写入
 
 ```assembly
-li $1, 1
-li $2, 2
-li $3, 3
-li $4, 4
-add $1, $1, $2
-add $1, $1, $3
-add $1, $1, $4
+li $t1, 1
+addi $t1, $t1, 1
+addi $t1, $t1, 2
+addi $t1, $t1, 3
 ```
 
 在最后一步中，`$1` 的值需要从之前的指令中定向而来。但是前一个指令（现在在 MEM 阶段）和前前一个指令（现在在 WB 阶段）都将 `$1` 的值写入到 `$1` 中。在这种情形中，需要从 MEM 阶段的指令中读取 `$1` 的值，而不是从 WB 阶段的指令中读取 `$1` 的值，才能获取正确的结果。
@@ -204,33 +211,48 @@ add $1, $1, $4
 如果 n <= 0，则储存 -1。
 
 ```assembly
-lw $1, 0($0)
-ble $1, $0, invalid_input
-li $2, 0
-li $3, 1
-beq $1, $3, return_0 # if $1 == 1, return_0
-li $4, 2
-beq $1, $4, return_1 # if $1 == 2, return_1
-addi $1, $1, -2 # because the first two fibonacci numbers are 0 and 1
+lw $t1, 0($0)
+ble $t1, $0, invalid_input
+li $t2, 0
+li $t3, 1
+beq $t1, $t3, return_0 # if $t1 == 1, return_0
+li $t4, 2
+beq $t1, $t4, return_1 # if $t1 == 2, return_1
+addi $t1, $t1, -2 # because the first two fibonacci numbers are 0 and 1
 loop:
-  beqz $1, end
-  addi $1, $1, -1
-  add $4, $2, $3
-  addi $2, $3, 0
-  addi $3, $4, 0
-  beqz $0, loop
+  beqz $t1, end
+  addi $t1, $t1, -1
+  add $t4, $t2, $t3
+  addi $t2, $t3, 0
+  addi $t3, $t4, 0
+  j loop
 invalid_input:
-  li $3, -1
-  beqz $0, end
+  li $t3, -1
+  j end
 return_0:
-  li $3, 0
-  beqz $0, end
+  li $t3, 0
+  j end
 return_1:
-  li $3, 1
-  beqz $0, end
+  li $t3, 1
+  j end
 end:
-  sw $3, 1($0)
+  sw $t3, 1($0)
 ```
 
-## 测试代码运行
+原理类似的 C 代码：
 
+```c
+int fib(int n) {
+  if (n <= 0) return -1;
+  if (n == 1) return 0;
+  if (n == 2) return 1;
+  n -= 2;
+  int a = 0, b = 1;
+  while (n--) {
+    int c = a + b;
+    a = b;
+    b = c;
+  }
+  return b;
+}
+```

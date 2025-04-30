@@ -1,4 +1,5 @@
 import { ControlSignals } from "./hardware/pipeline-registers";
+import { getRegisterIndex } from "./hardware/register-file";
 
 type InstructionType = {
   originalIndex: number | undefined;
@@ -86,8 +87,8 @@ export const _SUPPORTED_INSTRUCTIONS = [
   "bnez",
   "li",
   "nop",
-  // "mv",
-  // "j",
+  "mv",
+  "j",
 ] as const;
 type SupportedInstruction = (typeof _SUPPORTED_INSTRUCTIONS)[number];
 
@@ -313,6 +314,41 @@ function getParsers() {
     };
   });
 
+  parsers.set("mv", (raw, remaining) => {
+    const args = remaining.split(",").map((arg) => arg.trim());
+    if (args.length !== 2) {
+      throw new Error(`Invalid number of arguments`);
+    }
+    const rs1 = getRegisterIndex(args[1]);
+    const rd = getRegisterIndex(args[0]);
+    return getArithmeticIInst(raw, `$${rd}, $${rs1}, 0`, "add");
+  });
+  parsers.set("j", (raw, remaining) => {
+    const args = remaining.split(",").map((arg) => arg.trim());
+    if (args.length !== 1) {
+      throw new Error(`Invalid number of arguments`);
+    }
+    let immediate: string | number = parseInt(args[0]);
+    if (isNaN(immediate)) {
+      immediate = args[0];
+    }
+    return {
+      raw,
+      readingRegisters: [0, 0],
+      writingRegister: undefined,
+      immediate,
+      controlSignals: {
+        branchController: () => true,
+        aSel: "pc",
+        bSel: "immediate",
+        aluOp: "add",
+        memWriteEnable: false,
+        wbSel: "alu",
+        regWriteEnable: false,
+      },
+    };
+  });
+
   return parsers;
 }
 
@@ -367,14 +403,9 @@ function parseRType(remaining: string): [number, number, number] {
   if (args.length !== 3) {
     throw new Error(`Invalid number of arguments`);
   }
-  args.forEach((arg) => {
-    if (arg.charAt(0) !== "$" || isNaN(parseInt(arg.substring(1)))) {
-      throw new Error(`Invalid register format: ${arg}`);
-    }
-  });
-  const rs1 = parseInt(args[1].substring(1));
-  const rs2 = parseInt(args[2].substring(1));
-  const rd = parseInt(args[0].substring(1));
+  const rs1 = getRegisterIndex(args[1]);
+  const rs2 = getRegisterIndex(args[2]);
+  const rd = getRegisterIndex(args[0]);
   return [rs1, rs2, rd];
 }
 
@@ -383,14 +414,8 @@ function parseIType(remaining: string): [number, number, string | number] {
   if (args.length !== 3) {
     throw new Error(`Invalid number of arguments`);
   }
-  args.forEach((arg, i) => {
-    if (i >= 2) return;
-    if (arg.charAt(0) !== "$" || isNaN(parseInt(arg.substring(1)))) {
-      throw new Error(`Invalid register format: ${arg}`);
-    }
-  });
-  const resultRegisterIndex = parseInt(args[0].substring(1));
-  const registerIndex = parseInt(args[1].substring(1));
+  const resultRegisterIndex = getRegisterIndex(args[0]);
+  const registerIndex = getRegisterIndex(args[1]);
   let immediate: string | number = parseInt(args[2]);
   if (isNaN(immediate)) {
     immediate = args[2];
@@ -403,10 +428,7 @@ function parseBzType(remaining: string): [number, string | number] {
   if (args.length !== 2) {
     throw new Error(`Invalid number of arguments`);
   }
-  const registerIndex = parseInt(args[0].substring(1));
-  if (args[0].charAt(0) !== "$" || isNaN(parseInt(args[0].substring(1)))) {
-    throw new Error(`Invalid register format: ${args[0]}`);
-  }
+  const registerIndex = getRegisterIndex(args[0]);
   let immediate: string | number = parseInt(args[1]);
   if (isNaN(immediate)) {
     immediate = args[1];
@@ -419,30 +441,22 @@ function parseMemType(remaining: string): [number, number, number] {
   if (args.length !== 2) {
     throw new Error(`Invalid number of arguments`);
   }
-  if (args[0].charAt(0) !== "$") {
-    throw new Error(`Invalid register format: ${args[0]}`);
-  }
-  const rd = parseInt(args[0].substring(1));
+
+  const rd = getRegisterIndex(args[0]);
 
   // args[1] should look like 4($0)
   const addressParts = args[1].split("(");
   if (addressParts.length !== 2) {
     throw new Error(`Invalid address format: ${args[1]}`);
   }
-  const address = parseInt(addressParts[0]);
-  if (isNaN(address)) {
+  const imm = parseInt(addressParts[0]);
+  if (isNaN(imm)) {
     throw new Error(`Invalid address format: ${args[1]}`);
   }
   const reg = addressParts[1].substring(0, addressParts[1].length - 1);
-  if (reg.charAt(0) !== "$") {
-    throw new Error(`Invalid register format: ${addressParts[1]}`);
-  }
-  const rs1 = parseInt(reg.substring(1));
-  if (isNaN(rs1)) {
-    throw new Error(`Invalid register format: ${reg}`);
-  }
+  const rs1 = getRegisterIndex(reg);
 
-  return [rs1, rd, address];
+  return [rs1, rd, imm];
 }
 
 export function getDefaultInst(): InstructionType {

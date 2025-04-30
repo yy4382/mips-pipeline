@@ -8,7 +8,7 @@
 
 ### 寄存器表示
 
-只能使用 `$0` 这样的寄存器表示法，不能使用 `$t0` 这样的寄存器别名。
+支持 `$0` 这样的寄存器表示法，也支持使用 `$t0` 这样的寄存器别名。
 
 ### PC
 
@@ -30,13 +30,17 @@
 - 算数类 `add, sub, addi, and, andi, or, ori, xor, xori, sll, slli, srl, srli, sra, srai`
 - 内存类 `lw, sw`
 - 分支类 `beq, bne, blt, bgt, ble, bge`
-- pseudo-instruction `li, nop, beqz, bnez`
+- pseudo-instruction `li, nop, beqz, bnez, mv, j`
 
 > MIPS 中的 blt 等指令是 pseudo-instruction，实际上是用 `slt` 和 `bne` 实现的。为了简化实现，这里采用了类似 RISC-V 的实现方式，直接支持 `blt` 等指令。
 
-除了 `beqz` 和 `bnez` 其他一些常见的“伪指令”没有被支持。因此，
-  - `mv` 可用 `add` 代替
-  - `j` 可用 `beq $0, $0, target` 代替
+> 伪指令的实现方式：
+> - `li` 使用 `addi`
+> - `nop` 使用 `add $0, $0, $0`
+> - `beqz $t1, label` 使用 `beq $t1, $0, label`
+> - `bnez $t1, label` 使用 `bne $t1, $0, label`
+> - `mv $t1, $t2` 使用 `addi $t1, $t2, 0`
+> - `j label` 使用 `beq $0, $0, label`（不符合 MIPS 标准）
 
 对于跳转标签，可以和指令写在一行，也可以单独写在一行。
 

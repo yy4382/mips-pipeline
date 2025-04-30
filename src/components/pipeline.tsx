@@ -21,14 +21,14 @@ import { InstructionCycleGraph } from "./instruction-cycle-graph"; // Import the
 import { HazardForwardViewer } from "./hazard-forward-viewer";
 
 const DEFAULT_INSTRUCTION = `
-lw $1, 0($0)
-lw $2, 1($0)
+lw $t1, 0($0)
+lw $t2, 1($0)
 nop
 nop
-add $3, $1, $2
+add $t3, $t1, $t2
 nop
 nop
-sw $3, 2($0)
+sw $t3, 2($0)
 `;
 
 export function PipelineComp() {
@@ -58,8 +58,8 @@ export function PipelineComp() {
       const ele = (
         <div>
           <p className="text-lg">
-            {String(type).charAt(0).toUpperCase() + String(type).slice(1)}{" "}
-            Hazard happens at clock cycle {cause.clockCycle}
+            {type === "branch" ? "Control" : "Data"} Hazard happens at clock
+            cycle {cause.clockCycle}
           </p>
           <p className="text-sm">
             "{cause.inst.raw}" at index {cause.inst.originalIndex}

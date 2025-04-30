@@ -57,6 +57,12 @@ describe("parseInstruction", () => {
     expect(inst.immediate).toBe(4);
     expect(inst.writingRegister).toBe(undefined);
   })
+  test("parseInstruction - mv", ()=>{
+    const inst = Is.parseInsts(["mv $1, $2"])[0];
+    expect(inst.raw).toBe("mv $1, $2");
+    expect(inst.readingRegisters).toEqual([2, undefined]);
+    expect(inst.writingRegister).toBe(1);
+  })
   test("parseInstruction: label", () => {
     const insts = Is.parseInsts(
       `

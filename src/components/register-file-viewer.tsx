@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getRegisterName } from "@/lib/simulator/hardware/register-file";
 
 interface RegisterFileViewerProps {
   registerFile: readonly number[];
@@ -23,7 +24,9 @@ export const RegisterFileViewer: React.FC<RegisterFileViewerProps> = ({
               key={index}
               className="flex justify-between font-mono border-b pb-1"
             >
-              <span className="text-muted-foreground">${index}:</span>
+              <span className="text-muted-foreground">
+                {getRegisterName(index)}:
+              </span>
               <span>{value}</span>
             </div>
           ))}
