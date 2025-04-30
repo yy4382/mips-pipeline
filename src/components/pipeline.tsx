@@ -184,7 +184,7 @@ export function PipelineComp() {
         {/* Right column (3/5 width) */}
         <div className="lg:col-span-3 flex flex-col gap-6">
           <InstructionList instructions={instCycleGraph.at(-1)!.instructions} />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <MemoryViewer memory={memory} setMemory={handleSetMem} />
             <RegisterFileViewer registerFile={registerFile} />
           </div>

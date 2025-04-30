@@ -9,7 +9,7 @@ export const RegisterFileViewer: React.FC<RegisterFileViewerProps> = ({
   registerFile,
 }) => {
   return (
-    <Card className="w-full max-w-120">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Register File</CardTitle>
       </CardHeader>

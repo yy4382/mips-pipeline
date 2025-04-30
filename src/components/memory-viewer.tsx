@@ -93,7 +93,7 @@ export const MemoryViewer: React.FC<MemoryViewerProps> = ({
   };
 
   return (
-    <Card className="w-full max-w-120">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Memory Contents</CardTitle>
       </CardHeader>
