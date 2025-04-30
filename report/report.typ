@@ -431,7 +431,31 @@ li $t4, 2
 beq $t1, $t4, return_1 # if $t1 == 2, return_1
 addi $t1, $t1, -2 # because the first two fibonacci numbers are 0 and 1
 loop:
-  beqz $t1,
+  beqz $t1, end
+  addi $t1, $t1, -1
+  add $t4, $t2, $t3
+  addi $t2, $t3, 0
+  addi $t3, $t4, 0
+  j loop
+invalid_input:
+  li $t3, -1
+  j end
+return_0:
+  li $t3, 0
+  j end
+return_1:
+  li $t3, 1
+  j end
+end:
+  sw $t3, 1($0)
+```
+
+原理类似的 C 代码：
+
+```c
+int fib(int n) {
+  if (n <= 0) return -1;
+  if (n == 1) return 0;
   if (n == 2) return 1;
   n -= 2;
   int a = 0, b = 1;
