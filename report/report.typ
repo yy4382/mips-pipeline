@@ -6,6 +6,8 @@
 
 #set heading(numbering: "1.")
 
+#show link: underline
+
 #set heading(
   numbering: (..nums) => {
     // We want the positional arguments
@@ -117,7 +119,7 @@
 
 这样的简化主要是因为 JavaScript 中所有数字都是 IEEE 754 双精度浮点数，无法直接表示 32 位整数，这样将一个双精度浮点是当作一个“单位”对于「模拟流水线」的目标来说差异并不太大，但是在实现上会简单很多。
 
-汇编器和硬件的实现具体使用的标准写在了 [`src/lib/simulator/spec.md`](https://github.com/yy4382/mips-pipeline/blob/main/src/lib/simulator/spec.md) 中。
+汇编器和硬件的实现具体使用的标准写在了 #link("https://github.com/yy4382/mips-pipeline/blob/main/src/lib/simulator/spec.md")[src/lib/simulator/spec.md] 中。
 
 ==== 流水线模拟
 
