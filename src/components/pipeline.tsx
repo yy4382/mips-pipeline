@@ -146,7 +146,14 @@ export function PipelineComp() {
 
   const handleSetIMem = useCallback(
     (s: string) => {
-      pipelineRef.current.setIMem(InstructionMemory.parse(s), resetCallback);
+      let mem;
+      try {
+        mem = InstructionMemory.parse(s);
+      } catch (e) {
+        toast.error("Invalid instructions" + e);
+        return;
+      }
+      pipelineRef.current.setIMem(mem, resetCallback);
     },
     [resetCallback]
   );
