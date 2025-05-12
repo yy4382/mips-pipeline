@@ -1,12 +1,12 @@
-import { Instruction } from "./instruction";
-import { InstructionMemory } from "./hardware/instruction-memory";
-import { Memory } from "./hardware/memory";
-import { RegisterFile } from "./hardware/register-file";
+import { Instruction } from "../instruction";
+import { InstructionMemory } from "../hardware/instruction-memory";
+import { Memory } from "../hardware/memory";
+import { RegisterFile } from "../hardware/register-file";
 import {
   aluHandler,
   getDefaultPipelineRegs,
   PipelineRegs,
-} from "./hardware/pipeline-registers";
+} from "../hardware/pipeline-registers";
 
 export type HazardCallback = (
   type: "branch" | "data",

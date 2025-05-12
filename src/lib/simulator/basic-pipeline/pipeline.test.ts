@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Pipeline } from "./pipeline";
-import { InstructionMemory } from "./hardware/instruction-memory";
+import { InstructionMemory } from "../hardware/instruction-memory";
 
 test("pipeline - basic", () => {
   const iMem = InstructionMemory.parse(`

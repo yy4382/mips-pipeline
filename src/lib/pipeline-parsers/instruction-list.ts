@@ -1,5 +1,5 @@
 import { Instruction } from "../simulator/instruction";
-import { Pipeline } from "../simulator/pipeline";
+import { Pipeline } from "../simulator/basic-pipeline/pipeline";
 
 export type InstWithStage = {
   inst: Instruction;

@@ -3,7 +3,7 @@ import {
   ForwardDetail,
   HazardCallback,
   Pipeline,
-} from "../lib/simulator/pipeline";
+} from "../lib/simulator/basic-pipeline/pipeline";
 import { InstructionMemory } from "../lib/simulator/hardware/instruction-memory";
 import {
   InstWithStage,
