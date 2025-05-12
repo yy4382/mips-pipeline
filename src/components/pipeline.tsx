@@ -4,7 +4,6 @@ import {
   HazardCallback,
   Pipeline,
 } from "../lib/simulator/basic-pipeline/pipeline";
-import { InstructionMemory } from "../lib/simulator/hardware/instruction-memory";
 import {
   InstWithStage,
   parseInstWithStage,
@@ -19,6 +18,7 @@ import { Statistics } from "./statistics";
 import { PipelineControls } from "./pipeline-controls";
 import { InstructionCycleGraph } from "./instruction-cycle-graph"; // Import the new component
 import { HazardForwardViewer } from "./hazard-forward-viewer";
+import { getIMem5Stage } from "@/lib/simulator/basic-pipeline/instruction";
 
 const DEFAULT_INSTRUCTION = `
 lw $t1, 0($0)
@@ -35,7 +35,7 @@ export function PipelineComp() {
   const [useForwarding, setUseForwarding] = useState(false);
 
   const pipelineRef = useRef<Pipeline>(
-    new Pipeline(InstructionMemory.parse(DEFAULT_INSTRUCTION), useForwarding)
+    new Pipeline(getIMem5Stage(DEFAULT_INSTRUCTION), useForwarding)
   );
 
   const [instCycleGraph, setInstCycleGraph] = useState<InstCycleGraphData>([
@@ -148,7 +148,7 @@ export function PipelineComp() {
     (s: string) => {
       let mem;
       try {
-        mem = InstructionMemory.parse(s);
+        mem = getIMem5Stage(s);
       } catch (e) {
         toast.error("Invalid instructions" + e);
         return;

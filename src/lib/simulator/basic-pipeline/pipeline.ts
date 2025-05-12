@@ -1,4 +1,4 @@
-import { Instruction } from "../instruction";
+import { InstWith5StageCtrl } from "./instruction";
 import { InstructionMemory } from "../hardware/instruction-memory";
 import { Memory } from "../hardware/memory";
 import { RegisterFile } from "../hardware/register-file";
@@ -6,16 +6,16 @@ import {
   aluHandler,
   getDefaultPipelineRegs,
   PipelineRegs,
-} from "../hardware/pipeline-registers";
+} from "./pipeline-registers";
 
 export type HazardCallback = (
   type: "branch" | "data",
-  cause: { inst: Instruction; desc: string; clockCycle: number }
+  cause: { inst: InstWith5StageCtrl; desc: string; clockCycle: number }
 ) => void;
 
 export type ForwardDetail = {
-  target: { inst: Instruction; regIndex: number };
-  source: { inst: Instruction; regIndex: number };
+  target: { inst: InstWith5StageCtrl; regIndex: number };
+  source: { inst: InstWith5StageCtrl; regIndex: number };
   data: number;
   // note: in my code forwarding is happened when the inst to be forwarded just
   // finished the ID stage and the EX stage haven't started yet (clock cycle haven't
@@ -40,13 +40,16 @@ export class Pipeline {
    */
   pc: number;
   registerFile: RegisterFile;
-  iMem: InstructionMemory;
+  iMem: InstructionMemory<InstWith5StageCtrl>;
   mem: Memory;
   pipelineRegs: PipelineRegs;
   forwarding: boolean;
   statistics: Statistics;
 
-  constructor(iMem: InstructionMemory, forwarding: boolean = false) {
+  constructor(
+    iMem: InstructionMemory<InstWith5StageCtrl>,
+    forwarding: boolean = false
+  ) {
     this.pc = 0;
     this.registerFile = new RegisterFile();
     this.iMem = iMem;
@@ -209,7 +212,7 @@ export class Pipeline {
   }
 
   setIMem(
-    iMem: InstructionMemory,
+    iMem: InstructionMemory<InstWith5StageCtrl>,
     resetCallback: (pipeline: Pipeline) => void
   ) {
     this.iMem = iMem;
@@ -234,9 +237,9 @@ export class Pipeline {
     );
     if (inst.controlSignals.regWriteEnable) {
       if (inst.controlSignals.wbSel === "alu") {
-        this.registerFile.setAt(inst.writingRegister!, alu_input);
+        this.registerFile.setAt(inst.rd!, alu_input);
       } else if (inst.controlSignals.wbSel === "mem") {
-        this.registerFile.setAt(inst.writingRegister!, mem_input);
+        this.registerFile.setAt(inst.rd!, mem_input);
       }
     }
   }
@@ -300,8 +303,8 @@ export class Pipeline {
       immediate,
     });
 
-    const reg1 = this.registerFile.getAt(inst.readingRegisters[0] ?? 0);
-    const reg2 = this.registerFile.getAt(inst.readingRegisters[1] ?? 0);
+    const reg1 = this.registerFile.getAt(inst.rs[0] ?? 0);
+    const reg2 = this.registerFile.getAt(inst.rs[1] ?? 0);
     const immediate = inst.immediate ?? 0;
     return getReturn(reg1, reg2, immediate);
   }
@@ -332,9 +335,9 @@ function regIndexCollision(
 }
 
 function calculateHazards(pipelineRegs: PipelineRegs): boolean {
-  const readingRegs = pipelineRegs.id2ex.inst.readingRegisters;
-  const memWriteReg = pipelineRegs.ex2mem.inst.writingRegister;
-  const wbWriteReg = pipelineRegs.mem2wb.inst.writingRegister;
+  const readingRegs = pipelineRegs.id2ex.inst.rs;
+  const memWriteReg = pipelineRegs.ex2mem.inst.rd;
+  const wbWriteReg = pipelineRegs.mem2wb.inst.rd;
 
   for (const regIndex of readingRegs) {
     if (
@@ -362,9 +365,7 @@ function checkForwardingForRegister(
   forwardDetail?: Omit<ForwardDetail, "target" | "clockCycle">;
 } {
   // Check EX/MEM stage for collision
-  if (
-    regIndexCollision(targetRegIndex, pipelineRegs.ex2mem.inst.writingRegister)
-  ) {
+  if (regIndexCollision(targetRegIndex, pipelineRegs.ex2mem.inst.rd)) {
     // Load-use hazard: LW instruction in EX/MEM, data not ready yet.
     if (pipelineRegs.ex2mem.inst.controlSignals.wbSel === "mem") {
       return { needsStall: true };
@@ -375,7 +376,7 @@ function checkForwardingForRegister(
       forwardDetail: {
         source: {
           inst: pipelineRegs.ex2mem.inst,
-          regIndex: pipelineRegs.ex2mem.inst.writingRegister!,
+          regIndex: pipelineRegs.ex2mem.inst.rd!,
         },
         data: pipelineRegs.ex2mem.alu_out,
       },
@@ -383,16 +384,14 @@ function checkForwardingForRegister(
   }
 
   // Check MEM/WB stage for collision
-  if (
-    regIndexCollision(targetRegIndex, pipelineRegs.mem2wb.inst.writingRegister)
-  ) {
+  if (regIndexCollision(targetRegIndex, pipelineRegs.mem2wb.inst.rd)) {
     // Forward data in MEM/WB stage
     return {
       needsStall: false,
       forwardDetail: {
         source: {
           inst: pipelineRegs.mem2wb.inst,
-          regIndex: pipelineRegs.mem2wb.inst.writingRegister!,
+          regIndex: pipelineRegs.mem2wb.inst.rd!,
         },
         data:
           pipelineRegs.mem2wb.inst.controlSignals.wbSel === "mem"
@@ -418,7 +417,7 @@ function tryForward(
   forwardCb: (arg: Omit<ForwardDetail, "clockCycle">) => void,
   addForwardCount: () => void
 ): boolean {
-  const results = pipelineRegs.id2ex.inst.readingRegisters.map((regIndex) => {
+  const results = pipelineRegs.id2ex.inst.rs.map((regIndex) => {
     return [
       checkForwardingForRegister(regIndex, pipelineRegs),
       regIndex,

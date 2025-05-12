@@ -1,25 +1,25 @@
-import { getDefaultInst, Instruction } from "../instruction";
+import { getDefaultInst, InstWith5StageCtrl } from "./instruction";
 
 export type PipelineRegs = {
   mem2wb: {
-    inst: Instruction;
+    inst: InstWith5StageCtrl;
     mem: number;
     alu: number;
   };
   ex2mem: {
-    inst: Instruction;
+    inst: InstWith5StageCtrl;
     alu_out: number;
     write_data: number;
   };
   id2ex: {
-    inst: Instruction;
+    inst: InstWith5StageCtrl;
     reg1: number;
     reg2: number;
     pc: number;
     immediate: number;
   };
   if2id: {
-    inst: Instruction;
+    inst: InstWith5StageCtrl;
     pc: number;
   };
 };

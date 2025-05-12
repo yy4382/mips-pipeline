@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { Pipeline } from "./pipeline";
-import { InstructionMemory } from "../hardware/instruction-memory";
+import { getIMem5Stage } from "./instruction";
 
 test("pipeline - basic", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     nop
@@ -23,7 +23,7 @@ test("pipeline - basic", () => {
 });
 
 test("pipeline - basic branch - not branch", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     nop # avoid RAW
@@ -45,7 +45,7 @@ test("pipeline - basic branch - not branch", () => {
   expect(pipeline.registerFile.getAt(4)).toBe(2);
 });
 test("pipeline - basic branch - should branch", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     nop
@@ -69,7 +69,7 @@ test("pipeline - basic branch - should branch", () => {
 });
 
 test("pipeline - RAW", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     add $3, $1, $2
@@ -86,7 +86,7 @@ test("pipeline - RAW", () => {
 });
 
 test("pipeline - will branch and branch inst as RAW", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     lw $3, 2($0)
@@ -109,7 +109,7 @@ test("pipeline - will branch and branch inst as RAW", () => {
 });
 
 test("pipeline - will branch and flushed inst has RAW", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     beqz $0, 3
     lw $2, 1($0)
@@ -127,7 +127,7 @@ test("pipeline - will branch and flushed inst has RAW", () => {
 });
 
 test("pipeline - RAW and not branch", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     lw $3, 2($0)
@@ -148,7 +148,7 @@ test("pipeline - RAW and not branch", () => {
 });
 
 test("pipeline - RAW(forward)", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     add $3, $1, $2
@@ -165,7 +165,7 @@ test("pipeline - RAW(forward)", () => {
   expect(pipeline.statistics.forwardCount).toBe(2);
 });
 test("pipeline - RAW(forward)2", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     lw $1, 0($0)
     lw $2, 1($0)
     add $3, $1, $2
@@ -179,7 +179,7 @@ test("pipeline - RAW(forward)2", () => {
   expect(pipeline.registerFile.getAt(4)).toBe(6);
 });
 test("pipeline - RAW(forward) data both available in EX/MEM and MEM/WB", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
     li $1, 1
     li $2, 2
     li $3, 3
@@ -194,7 +194,7 @@ test("pipeline - RAW(forward) data both available in EX/MEM and MEM/WB", () => {
 });
 
 test("pipeline - branch jump back", () => {
-  const iMem = InstructionMemory.parse(`
+  const iMem = getIMem5Stage(`
 li $3, 3
 target: addi $1, $1, 1
 bne $1, $3, target
@@ -235,7 +235,7 @@ end:
   sw $3, 1($0)
 `;
   test("pipeline - calculate fibonacci 10th", () => {
-    const iMem = InstructionMemory.parse(fibonacci);
+    const iMem = getIMem5Stage(fibonacci);
 
     const pipeline = new Pipeline(iMem, true);
     pipeline.mem.setAt(0, 10); // calculate the 10th fibonacci number
@@ -243,21 +243,21 @@ end:
     expect(pipeline.mem.getAt(1)).toBe(34);
   });
   test("pipeline - calculate fibonacci 1th", () => {
-    const iMem = InstructionMemory.parse(fibonacci);
+    const iMem = getIMem5Stage(fibonacci);
     const pipeline = new Pipeline(iMem, true);
     pipeline.mem.setAt(0, 1); // calculate the 1th fibonacci number
     pipeline.tick(-1);
     expect(pipeline.mem.getAt(1)).toBe(0);
   });
   test("pipeline - calculate fibonacci 2th", () => {
-    const iMem = InstructionMemory.parse(fibonacci);
+    const iMem = getIMem5Stage(fibonacci);
     const pipeline = new Pipeline(iMem, true);
     pipeline.mem.setAt(0, 2); // calculate the 2th fibonacci number
     pipeline.tick(-1);
     expect(pipeline.mem.getAt(1)).toBe(1);
   });
   test("pipeline - calculate fibonacci 0th (return -1)", () => {
-    const iMem = InstructionMemory.parse(fibonacci);
+    const iMem = getIMem5Stage(fibonacci);
     const pipeline = new Pipeline(iMem, true);
     pipeline.mem.setAt(0, 0); // calculate the 0th fibonacci number (should return -1)
     pipeline.tick(-1);

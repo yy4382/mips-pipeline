@@ -1,8 +1,8 @@
-import { Instruction } from "../simulator/instruction";
+import { InstWith5StageCtrl } from "../simulator/basic-pipeline/instruction";
 import { Pipeline } from "../simulator/basic-pipeline/pipeline";
 
 export type InstWithStage = {
-  inst: Instruction;
+  inst: InstWith5StageCtrl;
   stage?: "IF" | "ID" | "EX" | "MEM" | "WB";
 };
 

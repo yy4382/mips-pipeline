@@ -1,27 +1,24 @@
-import { getDefaultInst, Instruction, parseInsts } from "../instruction";
+import { InstructionType } from "../instruction-parse/parse-inst";
 
-export class InstructionMemory {
-  public instructions: Instruction[];
+export class InstructionMemory<T extends InstructionType> {
+  public instructions: T[];
+  public getDefaultInst: () => T;
 
-  constructor(instructions: Instruction[]) {
+  constructor(instructions: T[], getDefaultInst: () => T) {
     this.instructions = instructions;
+    this.getDefaultInst = getDefaultInst;
   }
-  getInstructionAt(index: number): Instruction {
+  getInstructionAt(index: number): T {
     if (index < 0 || index >= 1000) {
       throw new Error(`Instruction index out of bounds: ${index}`);
     }
     if (index >= this.instructions.length) {
-      return getDefaultInst();
+      return this.getDefaultInst();
     }
     return this.instructions[index];
   }
   getSize(): number {
     return this.instructions.length;
-  }
-
-  static parse(raw: string): InstructionMemory {
-    const instructions = parseInsts(raw.split("\n"));
-    return new InstructionMemory(instructions);
   }
 
   reset() {
