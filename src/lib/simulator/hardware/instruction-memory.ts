@@ -1,5 +1,12 @@
 import { InstructionType } from "../instruction-parse/parse-inst";
 
+export class NoMoreInstruction extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMoreInstruction";
+  }
+}
+
 export class InstructionMemory<T extends InstructionType> {
   public instructions: T[];
   public getDefaultInst: () => T;
@@ -8,12 +15,18 @@ export class InstructionMemory<T extends InstructionType> {
     this.instructions = instructions;
     this.getDefaultInst = getDefaultInst;
   }
-  getInstructionAt(index: number): T {
+  getInstructionAt(index: number, outputDefaultIfOutOfBounds = true): T {
     if (index < 0 || index >= 1000) {
       throw new Error(`Instruction index out of bounds: ${index}`);
     }
     if (index >= this.instructions.length) {
-      return this.getDefaultInst();
+      if (outputDefaultIfOutOfBounds) {
+        return this.getDefaultInst();
+      } else {
+        throw new NoMoreInstruction(
+          `Instruction index out of bounds: ${index}`
+        );
+      }
     }
     return this.instructions[index];
   }

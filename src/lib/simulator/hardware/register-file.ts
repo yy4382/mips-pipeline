@@ -1,4 +1,4 @@
-const REGISTER_FILE_SIZE = 32;
+const REGISTER_FILE_SIZE = 32 + 8;
 
 export class RegisterFile {
   private registers: number[];
@@ -7,7 +7,11 @@ export class RegisterFile {
     this.registers = new Array(REGISTER_FILE_SIZE).fill(0);
   }
 
-  getAt(index: number): number {
+  getAt(indexOrName: number | string): number {
+    const index =
+      typeof indexOrName === "number"
+        ? indexOrName
+        : getRegisterIndex(indexOrName);
     if (index < 0 || index >= REGISTER_FILE_SIZE) {
       throw new Error(`Register index out of bounds: ${index}`);
     }
@@ -16,7 +20,11 @@ export class RegisterFile {
     }
     return this.registers[index];
   }
-  setAt(index: number, value: number): void {
+  setAt(indexOrName: number | string, value: number): void {
+    const index =
+      typeof indexOrName === "number"
+        ? indexOrName
+        : getRegisterIndex(indexOrName);
     if (index < 0 || index >= REGISTER_FILE_SIZE) {
       throw new Error(`Register index out of bounds: ${index}`);
     }
@@ -87,6 +95,15 @@ const registerNameMapping: Record<string, number> = {
   $sp: 29,
   $fp: 30,
   $ra: 31,
+
+  $f0: 32,
+  $f1: 33,
+  $f2: 34,
+  $f3: 35,
+  $f4: 36,
+  $f5: 37,
+  $f6: 38,
+  $f7: 39,
 };
 
 export function getRegisterIndex(str: string) {
