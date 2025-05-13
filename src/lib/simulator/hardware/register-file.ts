@@ -40,7 +40,9 @@ export class RegisterFile {
       );
       // Optionally throw an error or default to 0
       // throw new Error(`Invalid value type for register ${index}: ${value}`);
-      if (this.registers[index] !== 0) {
+      if (isNaN(value)) {
+        this.registers[index] = value; // if the value is NaN, use NaN (useful in tomasulo)
+      } else {
         this.registers[index] = 0; // Defaulting to 0
       }
     } else if (this.registers[index] !== numericValue) {

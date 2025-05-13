@@ -26,8 +26,10 @@ export class Memory {
       );
       // Optionally throw an error or default to 0
       // throw new Error(`Invalid value type for memory at index ${index}: ${value}`);
-      if (this.memory[index] !== 0) {
-        this.memory[index] = 0; // Defaulting to 0 if input is not a valid number
+      if (isNaN(value)) {
+        this.memory[index] = value; // if the value is NaN, use NaN (useful in tomasulo)
+      } else {
+        this.memory[index] = 0; // Defaulting to 0
       }
     } else if (this.memory[index] !== numericValue) {
       this.memory[index] = numericValue;
