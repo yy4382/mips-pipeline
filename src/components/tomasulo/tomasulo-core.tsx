@@ -34,9 +34,14 @@ export function TomasuloCoreDisplay({
     );
   }, [coreStatus, insts]);
   useEffect(() => {
+    console.log("coreStatus effect", coreStatus.length);
     setShowingClockCycle(coreStatus.length > 0 ? coreStatus.length - 1 : 0);
   }, [coreStatus]);
-  if (!coreStatus[showingClockCycle]) {
+
+  const displayUsedClockCycle =
+    coreStatus.length > showingClockCycle ? showingClockCycle : 0;
+
+  if (!coreStatus[displayUsedClockCycle]) {
     return null;
   }
   return (
@@ -60,25 +65,25 @@ export function TomasuloCoreDisplay({
               variant="outline"
               size="sm"
               onClick={() => {
-                if (showingClockCycle > 0) {
-                  setShowingClockCycle(showingClockCycle - 1);
+                if (displayUsedClockCycle > 0) {
+                  setShowingClockCycle(displayUsedClockCycle - 1);
                 }
               }}
-              disabled={showingClockCycle <= 0}
+              disabled={displayUsedClockCycle <= 0}
             >
               <ChevronLeft className="h-4 w-4 mr-2" />
               Previous
             </Button>
-            Clock Cycle: {showingClockCycle}
+            Clock Cycle: {displayUsedClockCycle}
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                if (showingClockCycle < coreStatus.length - 1) {
-                  setShowingClockCycle(showingClockCycle + 1);
+                if (displayUsedClockCycle < coreStatus.length - 1) {
+                  setShowingClockCycle(displayUsedClockCycle + 1);
                 }
               }}
-              disabled={showingClockCycle >= coreStatus.length - 1}
+              disabled={displayUsedClockCycle >= coreStatus.length - 1}
             >
               Next
               <ChevronRight className="h-4 w-4 ml-2" />
@@ -90,14 +95,16 @@ export function TomasuloCoreDisplay({
               <h3 className="text-base font-medium mb-3">
                 Reservation Stations
               </h3>
-              <ReservationStationComp rs={coreStatus[showingClockCycle].rs} />
+              <ReservationStationComp
+                rs={coreStatus[displayUsedClockCycle].rs}
+              />
             </div>
 
             <div>
               <h3 className="text-base font-medium mb-3">
                 Register Status (Qi)
               </h3>
-              <QiComp qi={coreStatus[showingClockCycle].qi} />
+              <QiComp qi={coreStatus[displayUsedClockCycle].qi} />
             </div>
           </div>
         </CardContent>
