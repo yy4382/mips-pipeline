@@ -1,6 +1,6 @@
 import { InstWithStage } from "@/lib/pipeline-parsers/instruction-list";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ScrollArea } from "./ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -8,7 +8,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table";
+} from "@/components/ui/table";
 
 export function InstructionList({
   instructions,

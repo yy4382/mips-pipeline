@@ -3,11 +3,11 @@ import {
   ForwardDetail,
   HazardCallback,
   Pipeline,
-} from "../lib/simulator/basic-pipeline/pipeline";
+} from "@/lib/simulator/basic-pipeline/pipeline";
 import {
   InstWithStage,
   parseInstWithStage,
-} from "../lib/pipeline-parsers/instruction-list";
+} from "@/lib/pipeline-parsers/instruction-list";
 import { InstructionList } from "./instruction-list";
 import { PipelineView } from "./pipeline-view";
 import { InstructionInput } from "./instruction-input";

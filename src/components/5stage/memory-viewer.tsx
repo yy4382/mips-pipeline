@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 
 import { Input } from "@/components/ui/input";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface MemoryViewerProps {
   memory: readonly number[];

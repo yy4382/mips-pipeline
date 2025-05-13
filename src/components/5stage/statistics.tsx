@@ -1,5 +1,5 @@
 import { type Statistics } from "@/lib/simulator/basic-pipeline/pipeline";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 export function Statistics({
   statistics,
   forwardStatus,

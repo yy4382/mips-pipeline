@@ -1,5 +1,5 @@
 import { InstCycleGraphData } from "./pipeline";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Stage = "IF" | "ID" | "EX" | "MEM" | "WB";
 

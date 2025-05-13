@@ -1,5 +1,5 @@
-import { PipelineRegs } from "../lib/simulator/basic-pipeline/pipeline-registers";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { PipelineRegs } from "@/lib/simulator/basic-pipeline/pipeline-registers";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function PipelineView({ pipelineRegs }: { pipelineRegs: PipelineRegs }) {
   return (

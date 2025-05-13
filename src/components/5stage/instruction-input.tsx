@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
 // Define example instructions based on test cases
 const exampleInstructions = [
