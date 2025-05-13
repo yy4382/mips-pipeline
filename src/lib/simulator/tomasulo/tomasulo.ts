@@ -1,3 +1,4 @@
+import { InstStatus } from "@/components/tomasulo/tomasulo";
 import {
   InstructionMemory,
   NoMoreInstruction,
@@ -8,7 +9,7 @@ import { InstToma } from "./instruction";
 
 type RegIndex = number;
 
-type ReservationStation = {
+export type ReservationStation = {
   busy: boolean;
   op: InstToma["instType"];
   vj: number;
@@ -22,12 +23,15 @@ type ReservationStation = {
   _inst: InstToma | null;
 };
 
-type RSIndex = {
+export type RSIndex = {
   type: "ADD" | "MUL" | "MEM";
   index: number;
 };
 
-function printRSIndex(rsIndex: RSIndex): string {
+export function printRSIndex(rsIndex: RSIndex | null): string {
+  if (!rsIndex) {
+    return "null";
+  }
   return `${rsIndex.type}${rsIndex.index}`;
 }
 
@@ -52,7 +56,7 @@ type ActionStore = {
   rsIndex: RSIndex;
 };
 
-type ReservationStationWithState = ReservationStation & {
+export type ReservationStationWithState = ReservationStation & {
   remainingTime: number | null;
 };
 
@@ -75,6 +79,7 @@ function reservationTickArithmetic(
   option: {
     rsIndex: RSIndex;
     cbdAvailable: boolean;
+    instStatusChangeCb?: InstStatusChangeCb;
   }
 ): ActionUpdateRS | ActionCommitChange | undefined {
   if (!rs.busy) {
@@ -87,6 +92,9 @@ function reservationTickArithmetic(
   if (rs.remainingTime === null) {
     if (rs.qj === null && rs.qk === null) {
       // start execution
+      if (option.instStatusChangeCb) {
+        option.instStatusChangeCb(rs._inst!, "executeStart");
+      }
       return {
         rsIndex,
         remainingTime: executeTime - 1,
@@ -111,6 +119,9 @@ function reservationTickArithmetic(
       } else {
         throw new Error("Invalid operation");
       }
+      if (option.instStatusChangeCb) {
+        option.instStatusChangeCb(rs._inst!, "writeBack");
+      }
       return {
         rsIndex,
         data,
@@ -134,6 +145,7 @@ function reservationTickLoad(
     cbdAvailable: boolean;
     rsIndex: RSIndex;
     getMem: (addr: number) => number;
+    instStatusChangeCb?: InstStatusChangeCb;
   }
 ): {
   update?: ActionUpdateRS;
@@ -151,6 +163,9 @@ function reservationTickLoad(
     // Instruction has not started execution yet
     if (isBufferFirst && rs.qj === null) {
       // Ready to start execution this tick
+      if (option.instStatusChangeCb) {
+        option.instStatusChangeCb(rs._inst!, "executeStart");
+      }
       return {
         update: {
           rsIndex,
@@ -167,6 +182,9 @@ function reservationTickLoad(
 
   if (rs.remainingTime <= 0) {
     if (cbdAvailable) {
+      if (option.instStatusChangeCb) {
+        option.instStatusChangeCb(rs._inst!, "writeBack");
+      }
       return {
         update: undefined,
         commit: {
@@ -194,6 +212,7 @@ function reservationTickStore(
   option: {
     isBufferFirst: boolean;
     rsIndex: RSIndex;
+    instStatusChangeCb?: InstStatusChangeCb;
   }
 ): ActionUpdateRS | ActionStore | undefined {
   if (!rs.busy) {
@@ -205,6 +224,9 @@ function reservationTickStore(
 
   if (rs.remainingTime === null) {
     if (isBufferFirst && rs.qj === null) {
+      if (option.instStatusChangeCb) {
+        option.instStatusChangeCb(rs._inst!, "executeStart");
+      }
       return {
         rsIndex,
         remainingTime: executeTime - 1,
@@ -216,6 +238,9 @@ function reservationTickStore(
   }
   // enter write back stage
   else if (rs.remainingTime <= 0 && rs.qk === null) {
+    if (option.instStatusChangeCb) {
+      option.instStatusChangeCb(rs._inst!, "writeBack");
+    }
     return {
       address: rs.address,
       data: rs.vk,
@@ -231,7 +256,7 @@ function reservationTickStore(
   }
 }
 
-type TomasoluCoreHardware = {
+type TomasuloCoreHardware = {
   reservationStations: Record<
     "ADD" | "MUL" | "MEM",
     ReservationStationWithState[]
@@ -239,7 +264,11 @@ type TomasoluCoreHardware = {
   qi: (RSIndex | null)[];
 };
 
-export class TomasoluProcessor {
+export type InstStatusChangeCb = (
+  inst: InstToma,
+  newStatus: InstStatus
+) => void;
+export class TomasuloProcessor {
   iMem: InstructionMemory<InstToma>;
   dMem: Memory;
 
@@ -247,7 +276,7 @@ export class TomasoluProcessor {
 
   registerFile: RegisterFile;
 
-  core: TomasoluCoreHardware;
+  core: TomasuloCoreHardware;
   memQueue: number[] = [];
 
   constructor(
@@ -291,9 +320,30 @@ export class TomasoluProcessor {
     };
   }
 
-  step(opt?: { debug: boolean }) {
+  step(opt?: { debug?: boolean; instStatusChangeCb?: InstStatusChangeCb }) {
     const issueResult = this.issue();
-    const { store, update, commit, popMemQueue } = this.tick();
+    const { store, update, commit, popMemQueue } = this.tick(
+      opt?.instStatusChangeCb
+    );
+
+    // call issue for the instruction that is issued this tick
+    if (issueResult?.rsData._inst && opt?.instStatusChangeCb) {
+      opt.instStatusChangeCb(issueResult.rsData._inst, "issued");
+    }
+    // call executeEnd for all instructions that have finished execution
+    if (opt?.instStatusChangeCb) {
+      for (const updateAct of update) {
+        if (updateAct.remainingTime === 0) {
+          const inst =
+            this.core.reservationStations[updateAct.rsIndex.type][
+              updateAct.rsIndex.index
+            ]._inst;
+          if (inst) {
+            opt.instStatusChangeCb(inst, "executeEnd");
+          }
+        }
+      }
+    }
 
     this.updateState(issueResult, commit, update, store, popMemQueue);
 
@@ -380,14 +430,9 @@ export class TomasoluProcessor {
   }
 
   private issue(): ActionLoadRS | undefined {
-    let inst: InstToma;
-    try {
-      inst = this.iMem.getInstructionAt(this.pc, false);
-    } catch (e) {
-      if (e instanceof NoMoreInstruction) {
-        return;
-      }
-      throw e;
+    const inst = this.getNextInst();
+    if (!inst) {
+      return;
     }
 
     const rs: ReservationStation = {
@@ -484,7 +529,7 @@ export class TomasoluProcessor {
     return;
   }
 
-  private tick() {
+  private tick(instStatusChangeCb?: InstStatusChangeCb) {
     const updateAction: ActionUpdateRS[] = [];
     let commitAction: ActionCommitChange | undefined = undefined;
     let storeAction: ActionStore | undefined;
@@ -494,6 +539,7 @@ export class TomasoluProcessor {
       const result = reservationTickArithmetic(rs, {
         rsIndex: { type: "ADD", index: i },
         cbdAvailable: commitAction === undefined,
+        instStatusChangeCb,
       });
       if (result) {
         if ("remainingTime" in result) {
@@ -507,6 +553,7 @@ export class TomasoluProcessor {
       const result = reservationTickArithmetic(rs, {
         rsIndex: { type: "MUL", index: i },
         cbdAvailable: commitAction === undefined,
+        instStatusChangeCb,
       });
       if (result) {
         if ("remainingTime" in result) {
@@ -523,6 +570,7 @@ export class TomasoluProcessor {
           getMem: (addr) => this.dMem.getAt(addr),
           isBufferFirst: this.memQueue.at(0) === i,
           rsIndex: { type: "MEM", index: i },
+          instStatusChangeCb,
         });
         const { update, commit, haveRead } = result;
         if (haveRead) {
@@ -538,6 +586,7 @@ export class TomasoluProcessor {
         const result = reservationTickStore(rs, {
           isBufferFirst: this.memQueue.at(0) === i,
           rsIndex: { type: "MEM", index: i },
+          instStatusChangeCb,
         });
         if (result) {
           if ("remainingTime" in result) {
@@ -608,5 +657,18 @@ export class TomasoluProcessor {
       this.core.reservationStations.MEM.every((rs) => !rs.busy) &&
       this.core.qi.every((q) => q === null)
     );
+  }
+
+  getNextInst(): InstToma | undefined {
+    let inst: InstToma;
+    try {
+      inst = this.iMem.getInstructionAt(this.pc, false);
+    } catch (e) {
+      if (e instanceof NoMoreInstruction) {
+        return;
+      }
+      throw e;
+    }
+    return inst;
   }
 }

@@ -71,7 +71,7 @@ export function getIMemToma(raw: string): InstructionMemory<InstToma> {
   const insts = parseInstsToma(raw.split("\n"));
   return new InstructionMemory(insts, () => {
     throw new Error(
-      "Should not be called, tomasolu does not need to insert default instructions"
+      "Should not be called, tomasulo does not need to insert default instructions"
     );
   });
 }
