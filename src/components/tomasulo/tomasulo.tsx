@@ -10,6 +10,8 @@ import { TomaControls } from "./tomasulo-control";
 import { TomasuloCoreDisplay } from "./tomasulo-core";
 import { RegisterFileViewer } from "../5stage/register-file-viewer";
 import { MemoryViewer } from "../5stage/memory-viewer";
+import { InstructionInput } from "../5stage/instruction-input";
+import { toast } from "sonner";
 
 export type InstructionStatus = {
   issued: boolean;
@@ -45,10 +47,18 @@ export function TomasuloComp() {
   const tomaProcessorRef = useRef<TomasuloProcessor>(null);
   const [coreStatus, setCoreStatus] = useState<TomasuloCoreStatus[]>([]);
   const [isFinished, setIsFinished] = useState(false);
+  const [instructions, setInstructions] = useState(DEFAULT_INST);
 
   const setIMem = useCallback((s: string) => {
-    const iMem = getIMemToma(s);
+    let iMem;
+    try {
+      iMem = getIMemToma(s);
+    } catch (e) {
+      toast.error("Invalid instructions" + e);
+      return;
+    }
     tomaProcessorRef.current = new TomasuloProcessor(iMem);
+    setInstructions(s);
     setCoreStatus([
       { ...parseCoreStatus(tomaProcessorRef.current), instStatus: [] },
     ]);
@@ -143,8 +153,8 @@ export function TomasuloComp() {
     if (tomaProcessorRef.current) {
       return;
     }
-    setIMem(DEFAULT_INST);
-  }, [setIMem]);
+    setIMem(instructions);
+  }, [setIMem, instructions]);
 
   return (
     <div>
@@ -152,7 +162,7 @@ export function TomasuloComp() {
         <TomaControls
           isFinished={isFinished}
           onReset={() => {
-            setIMem(DEFAULT_INST);
+            setIMem(instructions);
           }}
           onRun={run}
         />
@@ -165,6 +175,12 @@ export function TomasuloComp() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
           <MemoryViewer memory={memory} setMemory={handleSetMem} />
           <RegisterFileViewer registerFile={registerFile} slice={[32]} />
+        </div>
+        <div className="mt-6">
+          <InstructionInput
+            onChange={setIMem}
+            exampleInstructions={exampleInstructions}
+          />
         </div>
       </div>
     </div>
@@ -191,3 +207,29 @@ function parseCoreStatus(
     qi,
   };
 }
+
+const exampleInstructions = [
+  {
+    name: "Simple",
+    insts: `ADD.D $f0, $f1, $f2
+ADD.D $f3, $f4, $f5`,
+  },
+  {
+    name: "RAW (load-store)",
+    insts: DEFAULT_INST,
+  },
+  {
+    name: "WAR",
+    insts: `ADD.D $f0, $f2, $f4
+ADD.D $f2, $f4, $f6`,
+  },
+  {
+    name: "PPT",
+    insts: `L.D $f6, 0($2) 
+L.D $f2, 1($3) 
+MUL.D $f0, $f2, $f4 
+SUB.D $f8, $f6, $f2
+DIV.D $f10, $f0, $f6
+ADD.D $f6, $f8, $f2`,
+  },
+];

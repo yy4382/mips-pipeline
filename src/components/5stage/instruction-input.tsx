@@ -3,7 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
 // Define example instructions based on test cases
-const exampleInstructions = [
+const exampleInstructionsDefault = [
   {
     name: "RAW",
     insts: `# This is a test case for RAW
@@ -68,10 +68,14 @@ end:
 
 export function InstructionInput({
   onChange,
+  exampleInstructions: exampleInstructionsProp,
 }: {
   onChange: (instruction: string) => void;
+  exampleInstructions?: { name: string; insts: string }[];
 }) {
   const [inputValue, setInputValue] = useState("");
+  const exampleInstructions =
+    exampleInstructionsProp ?? exampleInstructionsDefault;
 
   const handleButtonClick = () => {
     onChange(inputValue);

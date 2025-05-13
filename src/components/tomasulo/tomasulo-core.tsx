@@ -34,7 +34,6 @@ export function TomasuloCoreDisplay({
     );
   }, [coreStatus, insts]);
   useEffect(() => {
-    console.log("effect", coreStatus.length);
     setShowingClockCycle(coreStatus.length > 0 ? coreStatus.length - 1 : 0);
   }, [coreStatus]);
   if (!coreStatus[showingClockCycle]) {
