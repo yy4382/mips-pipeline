@@ -15,7 +15,7 @@ type ReservationStation = {
   vk: number;
   qj: RSIndex | null;
   qk: RSIndex | null;
-  dest: RegIndex;
+  dest?: RegIndex;
   address: number;
 
   // Only used for visualization
@@ -26,6 +26,10 @@ type RSIndex = {
   type: "ADD" | "MUL" | "MEM";
   index: number;
 };
+
+function printRSIndex(rsIndex: RSIndex): string {
+  return `${rsIndex.type}${rsIndex.index}`;
+}
 
 type ActionLoadRS = {
   rsIndex: RSIndex;
@@ -52,10 +56,23 @@ type ReservationStationWithState = ReservationStation & {
   remainingTime: number | null;
 };
 
+function getOpExecuteTime(op: InstToma["instType"]): number {
+  if (op === "ADD.D" || op === "SUB.D") {
+    return 2;
+  } else if (op === "MUL.D") {
+    return 10;
+  } else if (op === "DIV.D") {
+    return 40;
+  } else if (op === "L.D" || op === "S.D") {
+    return 2;
+  } else {
+    throw new Error("Invalid operation");
+  }
+}
+
 function reservationTickArithmetic(
   rs: ReservationStationWithState,
   option: {
-    executeTime: number;
     rsIndex: RSIndex;
     cbdAvailable: boolean;
   }
@@ -63,7 +80,10 @@ function reservationTickArithmetic(
   if (!rs.busy) {
     return;
   }
-  const { executeTime, rsIndex, cbdAvailable } = option;
+  const { rsIndex, cbdAvailable } = option;
+  const executeTime = getOpExecuteTime(rs.op);
+
+  // if not started and ready to start, set remaining time to executeTime.
   if (rs.remainingTime === null) {
     if (rs.qj === null && rs.qk === null) {
       // start execution
@@ -75,106 +95,103 @@ function reservationTickArithmetic(
       return;
     }
   }
-  const nextRemainingTime = rs.remainingTime - 1;
-  if (cbdAvailable && nextRemainingTime <= 0) {
-    let data;
-    if (rs.op === "ADD.D") {
-      data = rs.vj + rs.vk;
-    } else if (rs.op === "SUB.D") {
-      data = rs.vj - rs.vk;
-    } else if (rs.op === "MUL.D") {
-      data = rs.vj * rs.vk;
-    } else if (rs.op === "DIV.D") {
-      data = rs.vj / rs.vk;
-    } else {
-      throw new Error("Invalid operation");
-    }
 
-    return {
-      rsIndex,
-      data,
-    };
-  } else {
-    return {
-      rsIndex,
-      remainingTime: nextRemainingTime,
-    };
+  // if started and remaining time is 0, commit the result
+  if (rs.remainingTime <= 0) {
+    if (cbdAvailable) {
+      let data;
+      if (rs.op === "ADD.D") {
+        data = rs.vj + rs.vk;
+      } else if (rs.op === "SUB.D") {
+        data = rs.vj - rs.vk;
+      } else if (rs.op === "MUL.D") {
+        data = rs.vj * rs.vk;
+      } else if (rs.op === "DIV.D") {
+        data = rs.vj / rs.vk;
+      } else {
+        throw new Error("Invalid operation");
+      }
+      return {
+        rsIndex,
+        data,
+      };
+    } else {
+      return;
+    }
   }
+
+  // if started and remaining time is not 0, just decrement remaining time
+  return {
+    rsIndex,
+    remainingTime: rs.remainingTime - 1,
+  };
 }
 
-// SHOULD NOT modify rs, in any way
 function reservationTickLoad(
   rs: ReservationStationWithState,
   option: {
-    executeTime: number;
     isBufferFirst: boolean;
     cbdAvailable: boolean;
     rsIndex: RSIndex;
     getMem: (addr: number) => number;
   }
 ): {
-  update: ActionUpdateRS | undefined;
-  commit: ActionCommitChange | undefined;
+  update?: ActionUpdateRS;
+  commit?: ActionCommitChange;
+  haveRead?: boolean;
 } {
   if (!rs.busy) {
     return { update: undefined, commit: undefined };
   }
 
-  const { executeTime, isBufferFirst, cbdAvailable, rsIndex, getMem } = option;
-
-  let isFirstTickExecution = false;
-  let potentialEffectiveAddr: number | undefined = undefined;
-  let nextRemainingTime: number;
+  const { isBufferFirst, cbdAvailable, rsIndex, getMem } = option;
+  const executeTime = getOpExecuteTime(rs.op);
 
   if (rs.remainingTime === null) {
     // Instruction has not started execution yet
     if (isBufferFirst && rs.qj === null) {
       // Ready to start execution this tick
-      isFirstTickExecution = true;
-      potentialEffectiveAddr = rs.vj + rs.address; // Calculate potential effective address
-      nextRemainingTime = executeTime - 1;
+      return {
+        update: {
+          rsIndex,
+          remainingTime: executeTime - 1,
+          address: rs.vj + rs.address,
+        },
+        commit: undefined,
+        haveRead: true,
+      };
     } else {
-      // Not ready to start (e.g., not first in buffer, or waiting for Vj)
+      return {};
+    }
+  }
+
+  if (rs.remainingTime <= 0) {
+    if (cbdAvailable) {
+      return {
+        update: undefined,
+        commit: {
+          rsIndex,
+          data: getMem(rs.address),
+        },
+      };
+    } else {
       return { update: undefined, commit: undefined };
     }
-  } else {
-    // Instruction is already executing
-    nextRemainingTime = rs.remainingTime - 1;
   }
 
-  // Check if the instruction can commit this tick
-  if (cbdAvailable && nextRemainingTime <= 0) {
-    const commitAction: ActionCommitChange = {
+  // if started and remaining time is not 0, just decrement remaining time
+  return {
+    update: {
       rsIndex,
-      data: getMem(potentialEffectiveAddr ?? rs.address),
-    };
-
-    return { update: undefined, commit: commitAction };
-  } else {
-    // Instruction does not commit this tick, just update remaining time
-    let updateActionContinuing: ActionUpdateRS;
-    if (isFirstTickExecution) {
-      // If it's the first tick but not committing,
-      updateActionContinuing = {
-        rsIndex,
-        remainingTime: nextRemainingTime,
-        address: potentialEffectiveAddr ?? rs.address,
-      };
-    } else {
-      // Already running and continuing execution
-      updateActionContinuing = {
-        rsIndex,
-        remainingTime: nextRemainingTime,
-      };
-    }
-    return { update: updateActionContinuing, commit: undefined };
-  }
+      remainingTime: rs.remainingTime - 1,
+    },
+    commit: undefined,
+  };
 }
 
 function reservationTickStore(
   rs: ReservationStationWithState,
   option: {
-    executeTime: number;
     isBufferFirst: boolean;
     rsIndex: RSIndex;
   }
@@ -182,7 +199,10 @@ function reservationTickStore(
   if (!rs.busy) {
     return;
   }
-  const { executeTime, isBufferFirst, rsIndex } = option;
+  const { isBufferFirst, rsIndex } = option;
+
+  const executeTime = getOpExecuteTime(rs.op);
+
   if (rs.remainingTime === null) {
     if (isBufferFirst && rs.qj === null) {
       return {
@@ -194,13 +214,16 @@ function reservationTickStore(
       return;
     }
   }
-  if (rs.remainingTime <= 0 && rs.qk === null) {
+  // enter write back stage
+  else if (rs.remainingTime <= 0 && rs.qk === null) {
     return {
       address: rs.address,
       data: rs.vk,
       rsIndex,
     };
-  } else {
+  }
+  // just decrement remaining time
+  else {
     return {
       rsIndex,
       remainingTime: rs.remainingTime - 1,
@@ -227,7 +250,14 @@ export class TomasoluProcessor {
   core: TomasoluCoreHardware;
   memQueue: number[] = [];
 
-  constructor(iMem: InstructionMemory<InstToma>) {
+  constructor(
+    iMem: InstructionMemory<InstToma>,
+    componentCount: { add: number; mul: number; mem: number } = {
+      add: 3,
+      mem: 3,
+      mul: 2,
+    }
+  ) {
     this.iMem = iMem;
     this.dMem = new Memory();
     this.registerFile = new RegisterFile();
@@ -253,18 +283,59 @@ export class TomasoluProcessor {
 
     this.core = {
       reservationStations: {
-        ADD: generateRs(2),
-        MUL: generateRs(2),
-        MEM: generateRs(2),
+        ADD: generateRs(componentCount.add),
+        MUL: generateRs(componentCount.mul),
+        MEM: generateRs(componentCount.mem),
       },
       qi: Array.from({ length: this.registerFile.getSize() }, () => null),
     };
   }
 
-  step() {
+  step(opt?: { debug: boolean }) {
     const issueResult = this.issue();
-    const { store, update, commit } = this.tick();
+    const { store, update, commit, popMemQueue } = this.tick();
 
+    this.updateState(issueResult, commit, update, store, popMemQueue);
+
+    if (opt?.debug) {
+      this.printState();
+    }
+
+    return this.isFinished();
+  }
+
+  private printState() {
+    Object.values(this.core.reservationStations)
+      .flat()
+      .forEach((rs) => {
+        if (!rs.busy) {
+          return;
+        }
+        console.log(
+          `op:${rs.op}, vj:${rs.vj}, vk:${rs.vk}, qj:${
+            rs.qj ? printRSIndex(rs.qj) : "null"
+          }, qk:${rs.qk ? printRSIndex(rs.qk) : "null"}, remainingTime:${
+            rs.remainingTime
+          }`
+        );
+      });
+    if (this.core.qi.some((q) => q !== null)) {
+      console.log(
+        this.core.qi
+          .slice(32)
+          .map((q, i) => (q ? `${i}: ${q.type}${q.index}` : `${i}: ''`))
+          .join(", ")
+      );
+    }
+  }
+
+  private updateState(
+    issueResult: ActionLoadRS | undefined,
+    commit: ActionCommitChange | undefined,
+    update: ActionUpdateRS[],
+    store: ActionStore | undefined,
+    popMemQueue: boolean
+  ) {
     if (issueResult) {
       this.pc++;
       const { type, index } = issueResult.rsIndex;
@@ -272,7 +343,9 @@ export class TomasoluProcessor {
         ...issueResult.rsData,
         remainingTime: null,
       };
-      this.core.qi[issueResult.rsData.dest] = issueResult.rsIndex;
+      if (issueResult.rsData.dest) {
+        this.core.qi[issueResult.rsData.dest] = issueResult.rsIndex;
+      }
       if (type === "MEM") {
         this.memQueue.push(issueResult.rsIndex.index);
       }
@@ -282,9 +355,6 @@ export class TomasoluProcessor {
       const { type, index } = commit.rsIndex;
       this.core.reservationStations[type][index].busy = false;
       this.commitChange(commit);
-      if (type === "MEM") {
-        this.memQueue.shift();
-      }
     }
 
     update.forEach((action) => {
@@ -300,10 +370,10 @@ export class TomasoluProcessor {
     if (store) {
       this.dMem.setAt(store.address, store.data);
       this.core.reservationStations.MEM[store.rsIndex.index].busy = false;
+    }
+    if (popMemQueue) {
       if (this.memQueue.length <= 0) {
-        throw new Error(
-          "Mem queue is empty when storing, which should not happen"
-        );
+        throw new Error("Mem queue is empty, which should not happen");
       }
       this.memQueue.shift();
     }
@@ -327,12 +397,12 @@ export class TomasoluProcessor {
       vk: 0,
       qj: null,
       qk: null,
-      dest: 0,
+      dest: undefined,
       address: 0,
       _inst: inst,
     };
     if (this.isArithmeticInst(inst)) {
-      rs.dest = inst.rd!;
+      rs.dest = inst.rd;
 
       const { q: qj, v: vj } = this.checkRegReady(inst.rs[0]!);
       rs.qj = qj;
@@ -365,7 +435,7 @@ export class TomasoluProcessor {
       }
       return;
     } else if (inst.instType === "L.D") {
-      rs.dest = inst.rd!;
+      rs.dest = inst.rd;
       rs.address = inst.immediate!;
 
       const { q: qj, v: vj } = this.checkRegReady(inst.rs[0]!);
@@ -418,9 +488,10 @@ export class TomasoluProcessor {
     const updateAction: ActionUpdateRS[] = [];
     let commitAction: ActionCommitChange | undefined = undefined;
     let storeAction: ActionStore | undefined;
+    let popMemQueue = false;
+
     this.core.reservationStations.ADD.forEach((rs, i) => {
       const result = reservationTickArithmetic(rs, {
-        executeTime: 2,
         rsIndex: { type: "ADD", index: i },
         cbdAvailable: commitAction === undefined,
       });
@@ -434,7 +505,6 @@ export class TomasoluProcessor {
     });
     this.core.reservationStations.MUL.forEach((rs, i) => {
       const result = reservationTickArithmetic(rs, {
-        executeTime: 10,
         rsIndex: { type: "MUL", index: i },
         cbdAvailable: commitAction === undefined,
       });
@@ -449,13 +519,15 @@ export class TomasoluProcessor {
     this.core.reservationStations.MEM.forEach((rs, i) => {
       if (rs.op === "L.D") {
         const result = reservationTickLoad(rs, {
-          executeTime: 1,
           cbdAvailable: commitAction === undefined,
           getMem: (addr) => this.dMem.getAt(addr),
           isBufferFirst: this.memQueue.at(0) === i,
           rsIndex: { type: "MEM", index: i },
         });
-        const { update, commit } = result;
+        const { update, commit, haveRead } = result;
+        if (haveRead) {
+          popMemQueue = true;
+        }
         if (update) {
           updateAction.push(update);
         }
@@ -464,7 +536,6 @@ export class TomasoluProcessor {
         }
       } else {
         const result = reservationTickStore(rs, {
-          executeTime: 2,
           isBufferFirst: this.memQueue.at(0) === i,
           rsIndex: { type: "MEM", index: i },
         });
@@ -473,6 +544,7 @@ export class TomasoluProcessor {
             updateAction.push(result);
           } else {
             storeAction = result;
+            popMemQueue = true;
           }
         }
       }
@@ -482,6 +554,7 @@ export class TomasoluProcessor {
       update: updateAction,
       commit: commitAction as ActionCommitChange | undefined,
       store: storeAction,
+      popMemQueue,
     };
   }
 
@@ -525,6 +598,15 @@ export class TomasoluProcessor {
       inst.instType === "SUB.D" ||
       inst.instType === "MUL.D" ||
       inst.instType === "DIV.D"
+    );
+  }
+
+  private isFinished(): boolean {
+    return (
+      this.core.reservationStations.ADD.every((rs) => !rs.busy) &&
+      this.core.reservationStations.MUL.every((rs) => !rs.busy) &&
+      this.core.reservationStations.MEM.every((rs) => !rs.busy) &&
+      this.core.qi.every((q) => q === null)
     );
   }
 }

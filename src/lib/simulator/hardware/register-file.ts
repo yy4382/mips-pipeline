@@ -1,4 +1,4 @@
-const REGISTER_FILE_SIZE = 32 + 8;
+const REGISTER_FILE_SIZE = 32 + 16;
 
 export class RegisterFile {
   private registers: number[];
@@ -104,6 +104,14 @@ const registerNameMapping: Record<string, number> = {
   $f5: 37,
   $f6: 38,
   $f7: 39,
+  $f8: 40,
+  $f9: 41,
+  $f10: 42,
+  $f11: 43,
+  $f12: 44,
+  $f13: 45,
+  $f14: 46,
+  $f15: 47,
 };
 
 export function getRegisterIndex(str: string) {
