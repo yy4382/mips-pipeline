@@ -27,4 +27,4 @@ dist-ssr
 
 coverage/
 
-report/*.pdf
+report/**/*.pdf
