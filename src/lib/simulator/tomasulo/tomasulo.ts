@@ -268,6 +268,12 @@ export type InstStatusChangeCb = (
   inst: InstToma,
   newStatus: InstStatus
 ) => void;
+
+export type TomasuloStatistics = {
+  clockCycleCount: number;
+  finishedInstCount: number;
+};
+
 export class TomasuloProcessor {
   iMem: InstructionMemory<InstToma>;
   dMem: Memory;
@@ -278,6 +284,11 @@ export class TomasuloProcessor {
 
   core: TomasuloCoreHardware;
   memQueue: number[] = [];
+
+  statistics: TomasuloStatistics = {
+    clockCycleCount: 0,
+    finishedInstCount: 0,
+  };
 
   constructor(
     iMem: InstructionMemory<InstToma>,
@@ -326,11 +337,17 @@ export class TomasuloProcessor {
       opt?.instStatusChangeCb
     );
 
-    // call issue for the instruction that is issued this tick
+    // update statistics
+    this.statistics.clockCycleCount++;
+    if (commit || store) {
+      this.statistics.finishedInstCount++;
+    }
+
+    // call issue cb for the instruction that is issued this tick
     if (issueResult?.rsData._inst && opt?.instStatusChangeCb) {
       opt.instStatusChangeCb(issueResult.rsData._inst, "issued");
     }
-    // call executeEnd for all instructions that have finished execution
+    // call executeEnd cb for all instructions that have finished execution
     if (opt?.instStatusChangeCb) {
       for (const updateAct of update) {
         if (updateAct.remainingTime === 0) {

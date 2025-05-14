@@ -4,6 +4,7 @@ import {
   ReservationStationWithState,
   RSIndex,
   TomasuloProcessor,
+  TomasuloStatistics,
 } from "@/lib/simulator/tomasulo/tomasulo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TomaControls } from "./tomasulo-control";
@@ -12,6 +13,7 @@ import { RegisterFileViewer } from "../5stage/register-file-viewer";
 import { MemoryViewer } from "../5stage/memory-viewer";
 import { InstructionInput } from "../5stage/instruction-input";
 import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 
 export type InstructionStatus = {
   issued: boolean;
@@ -48,6 +50,10 @@ export function TomasuloComp() {
   const [coreStatus, setCoreStatus] = useState<TomasuloCoreStatus[]>([]);
   const [isFinished, setIsFinished] = useState(false);
   const [instructions, setInstructions] = useState(DEFAULT_INST);
+  const [statistics, setStatistics] = useState<TomasuloStatistics>({
+    clockCycleCount: 0,
+    finishedInstCount: 0,
+  });
 
   const setIMem = useCallback((s: string) => {
     let iMem;
@@ -67,6 +73,10 @@ export function TomasuloComp() {
     );
     setMemory(tomaProcessorRef.current?.dMem.getMemory() ?? []);
     setIsFinished(false);
+    setStatistics({
+      clockCycleCount: 0,
+      finishedInstCount: 0,
+    });
   }, []);
 
   const step = useCallback<() => boolean>(() => {
@@ -108,6 +118,12 @@ export function TomasuloComp() {
       tomaProcessorRef.current?.registerFile.getRegisters() ?? []
     );
     setMemory(tomaProcessorRef.current?.dMem.getMemory() ?? []);
+    setStatistics({
+      clockCycleCount:
+        tomaProcessorRef.current?.statistics.clockCycleCount ?? 0,
+      finishedInstCount:
+        tomaProcessorRef.current?.statistics.finishedInstCount ?? 0,
+    });
     return finished;
   }, []);
 
@@ -177,6 +193,9 @@ export function TomasuloComp() {
           <RegisterFileViewer registerFile={registerFile} slice={[32]} />
         </div>
         <div className="mt-6">
+          <StatisticsViewer statistics={statistics} />
+        </div>
+        <div className="mt-6">
           <InstructionInput
             onChange={setIMem}
             exampleInstructions={exampleInstructions}
@@ -233,3 +252,17 @@ DIV.D $f10, $f0, $f6
 ADD.D $f6, $f8, $f2`,
   },
 ];
+
+function StatisticsViewer({ statistics }: { statistics: TomasuloStatistics }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Statistics</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p>Clock Cycle Count: {statistics.clockCycleCount}</p>
+        <p>Finished Inst Count: {statistics.finishedInstCount}</p>
+      </CardContent>
+    </Card>
+  );
+}
