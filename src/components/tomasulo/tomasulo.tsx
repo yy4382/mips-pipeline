@@ -230,17 +230,19 @@ function parseCoreStatus(
 const exampleInstructions = [
   {
     name: "Simple",
-    insts: `ADD.D $f0, $f1, $f2
-ADD.D $f3, $f4, $f5`,
+    insts: `L.D $f0, 0($0)
+ADD.D $f1, $f2, $f2
+S.D $f3, 0($1)`,
   },
   {
-    name: "RAW (load-store)",
+    name: "RAW",
     insts: DEFAULT_INST,
   },
   {
     name: "WAR",
-    insts: `ADD.D $f0, $f2, $f4
-ADD.D $f2, $f4, $f6`,
+    insts: `MUL.D $f4, $f1, $f1
+ADD.D $f0, $f2, $f4
+ADD.D $f2, $f3, $f6`,
   },
   {
     name: "PPT",

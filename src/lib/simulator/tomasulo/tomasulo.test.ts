@@ -95,7 +95,7 @@ test("tomasulo example in slide", () => {
   expect(step).toBe(57);
 });
 
-describe("tomasulo cbd available tests", () => {
+describe("tomasulo cdb available tests", () => {
   test("arithmetic", () => {
     const inst = `
 MUL.D $f1, $f2, $f3
@@ -120,7 +120,7 @@ SUB.D $f6, $f1, $f7
     const inst = `
 ADD.D $f1, $f1, $f2
 ADD.D $f0, $f1, $f2
-ADD.D $f3, $f3, $f3
+ADD.D $f3, $f3, $f3 # buffer to align the wb stage of the last with the next inst
 L.D $f0, 0($0)
 `;
     const processor = new TomasuloProcessor(getIMemToma(inst));

@@ -78,14 +78,14 @@ function reservationTickArithmetic(
   rs: ReservationStationWithState,
   option: {
     rsIndex: RSIndex;
-    cbdAvailable: boolean;
+    cdbAvailable: boolean;
     instStatusChangeCb?: InstStatusChangeCb;
   }
 ): ActionUpdateRS | ActionCommitChange | undefined {
   if (!rs.busy) {
     return;
   }
-  const { rsIndex, cbdAvailable } = option;
+  const { rsIndex, cdbAvailable } = option;
   const executeTime = getOpExecuteTime(rs.op);
 
   // if not started and ready to start, set remaining time to executeTime.
@@ -106,7 +106,7 @@ function reservationTickArithmetic(
 
   // if started and remaining time is 0, commit the result
   if (rs.remainingTime <= 0) {
-    if (cbdAvailable) {
+    if (cdbAvailable) {
       let data;
       if (rs.op === "ADD.D") {
         data = rs.vj + rs.vk;
@@ -142,7 +142,7 @@ function reservationTickLoad(
   rs: ReservationStationWithState,
   option: {
     isBufferFirst: boolean;
-    cbdAvailable: boolean;
+    cdbAvailable: boolean;
     rsIndex: RSIndex;
     getMem: (addr: number) => number;
     instStatusChangeCb?: InstStatusChangeCb;
@@ -156,7 +156,7 @@ function reservationTickLoad(
     return { update: undefined, commit: undefined };
   }
 
-  const { isBufferFirst, cbdAvailable, rsIndex, getMem } = option;
+  const { isBufferFirst, cdbAvailable, rsIndex, getMem } = option;
   const executeTime = getOpExecuteTime(rs.op);
 
   if (rs.remainingTime === null) {
@@ -181,7 +181,7 @@ function reservationTickLoad(
   }
 
   if (rs.remainingTime <= 0) {
-    if (cbdAvailable) {
+    if (cdbAvailable) {
       if (option.instStatusChangeCb) {
         option.instStatusChangeCb(rs._inst!, "writeBack");
       }
@@ -555,7 +555,7 @@ export class TomasuloProcessor {
     this.core.reservationStations.ADD.forEach((rs, i) => {
       const result = reservationTickArithmetic(rs, {
         rsIndex: { type: "ADD", index: i },
-        cbdAvailable: commitAction === undefined,
+        cdbAvailable: commitAction === undefined,
         instStatusChangeCb,
       });
       if (result) {
@@ -569,7 +569,7 @@ export class TomasuloProcessor {
     this.core.reservationStations.MUL.forEach((rs, i) => {
       const result = reservationTickArithmetic(rs, {
         rsIndex: { type: "MUL", index: i },
-        cbdAvailable: commitAction === undefined,
+        cdbAvailable: commitAction === undefined,
         instStatusChangeCb,
       });
       if (result) {
@@ -583,7 +583,7 @@ export class TomasuloProcessor {
     this.core.reservationStations.MEM.forEach((rs, i) => {
       if (rs.op === "L.D") {
         const result = reservationTickLoad(rs, {
-          cbdAvailable: commitAction === undefined,
+          cdbAvailable: commitAction === undefined,
           getMem: (addr) => this.dMem.getAt(addr),
           isBufferFirst: this.memQueue.at(0) === i,
           rsIndex: { type: "MEM", index: i },
